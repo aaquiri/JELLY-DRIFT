@@ -1,0 +1,2088 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.4 system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>Jelly Drift</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sniglet:wght@400;800&family=Nunito:wght@500;700;800&display=swap">
+<style>
+/* Layout: one full-height ocean screen, HUD floating on top, tabbed menu card centered. Single deep-sea theme by choice. */
+:root {
+  --abyss: #050b24;
+  --deep: #0b1d4a;
+  --glow: #ff8fd8;
+  --glow-2: #8ff3ff;
+  --gold: #ffe27a;
+  --ink: #eef6ff;
+  --muted: #9fb3d9;
+  --display: "Sniglet", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Nunito", system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--abyss); color: var(--ink); font-family: var(--body);
+  overflow: hidden; touch-action: manipulation;
+  -webkit-user-select: none; user-select: none;
+}
+.stage { position: relative; height: 100%; width: 100%; }
+canvas#game { display: block; width: 100%; height: 100%; cursor: pointer; }
+
+.hud {
+  position: absolute; top: 10px; left: 0; right: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  pointer-events: none;
+}
+.hud-left { display: grid; gap: 2px; }
+.score { font-family: var(--display); font-weight: 800; font-size: 2.6rem; line-height: 1; text-shadow: 0 0 18px var(--glow); font-variant-numeric: tabular-nums; }
+.sub { font-weight: 800; font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); text-shadow: 0 1px 6px rgba(5,11,36,.8); }
+.hud .combo { text-shadow: 0 1px 6px rgba(5,11,36,.8); }
+.sub b { color: var(--glow-2); font-variant-numeric: tabular-nums; }
+.combo { color: var(--gold); font-family: var(--display); font-size: 1.1rem; min-height: 1.3em; }
+.powers { display: flex; gap: 6px; min-height: 28px; flex-wrap: wrap; }
+.pw { font-size: .72rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; color: var(--abyss); }
+.hud-right { display: flex; gap: 8px; pointer-events: auto; }
+.icon-btn {
+  width: 40px; height: 40px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--glow-2) 35%, transparent);
+  background: color-mix(in srgb, var(--deep) 70%, transparent); color: var(--ink);
+  font-size: 1.05rem; cursor: pointer; display: grid; place-items: center;
+}
+.icon-btn[aria-pressed="false"] { opacity: .45; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+.overlay {
+  position: absolute; inset: 0; display: grid; justify-items: center; align-items: start; overflow-y: auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 64px 20px; pointer-events: none;
+}
+.card {
+  pointer-events: auto; text-align: center; width: 100%; max-width: 26rem; margin-block: auto;
+  display: grid; gap: 14px; justify-items: center;
+  padding: 20px 18px; border-radius: 28px;
+  background: color-mix(in srgb, var(--deep) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--glow-2) 25%, transparent);
+  backdrop-filter: blur(8px);
+}
+.card h1 {
+  margin: 0; font-family: var(--display); font-weight: 800; cursor: pointer;
+  font-size: clamp(2.3rem, 10vw, 3.3rem); line-height: .95; color: var(--glow);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--glow) 60%, transparent); text-wrap: balance;
+}
+.card h1.wiggle { animation: wiggle .35s ease; }
+@keyframes wiggle { 25% { transform: rotate(-4deg) scale(1.05); } 75% { transform: rotate(4deg) scale(1.05); } }
+.card p { margin: 0; color: var(--muted); font-weight: 700; line-height: 1.4; }
+.label { font-size: .72rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.pearls { font-family: var(--display); color: var(--glow-2); font-size: 1rem; display: inline-flex; align-items: center; gap: 6px; }
+.pearl-dot { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fffbe0, #ffd23f 55%, #c8961e); box-shadow: 0 0 8px #ffd23f; }
+.pearls { color: var(--gold); }
+
+.tabs { display: flex; gap: 6px; padding: 4px; border-radius: 999px; background: color-mix(in srgb, var(--abyss) 60%, transparent); }
+.tab { font: 800 .9rem var(--display); color: var(--muted); background: transparent; border: 0; border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+.tab[aria-pressed="true"] { background: var(--glow); color: var(--abyss); }
+.panel { display: grid; gap: 12px; justify-items: center; width: 100%; }
+
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+.mode {
+  text-align: left; cursor: pointer; padding: 10px 12px; border-radius: 16px;
+  background: color-mix(in srgb, var(--abyss) 60%, transparent);
+  border: 2px solid transparent; color: var(--ink); font-family: var(--body); display: grid; gap: 2px;
+}
+.mode strong { font-family: var(--display); font-size: 1.05rem; }
+.mode span { font-size: .75rem; color: var(--muted); font-weight: 700; line-height: 1.3; }
+.mode em { font-style: normal; font-size: .7rem; color: var(--glow-2); font-weight: 800; font-variant-numeric: tabular-nums; }
+.mode[aria-pressed="true"] { border-color: var(--glow-2); background: color-mix(in srgb, var(--glow-2) 14%, transparent); }
+
+.btn {
+  font: 800 1.15rem var(--display); color: var(--abyss); background: var(--glow-2);
+  border: 0; border-radius: 999px; padding: 12px 30px; cursor: pointer;
+  box-shadow: 0 0 22px color-mix(in srgb, var(--glow-2) 55%, transparent); transition: transform .12s ease;
+}
+.btn.small { font-size: .9rem; padding: 8px 16px; }
+.btn.ghost { background: transparent; color: var(--ink); box-shadow: none; border: 2px solid color-mix(in srgb, var(--ink) 30%, transparent); }
+.btn:hover { transform: scale(1.05); }
+.btn:active { transform: scale(.96); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: center; }
+.tip { font-size: .75rem; letter-spacing: .1em; text-transform: uppercase; }
+
+.preview { width: 150px; height: 130px; }
+.field { display: flex; gap: 8px; width: 100%; }
+.field input {
+  flex: 1; min-width: 0; font: 700 1rem var(--body); color: var(--ink);
+  background: color-mix(in srgb, var(--abyss) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--glow-2) 30%, transparent); border-radius: 12px; padding: 9px 12px;
+  -webkit-user-select: text; user-select: text;
+}
+.section { width: 100%; display: grid; gap: 8px; text-align: left; }
+.items { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.item {
+  cursor: pointer; border-radius: 14px; padding: 8px 6px; text-align: center;
+  background: color-mix(in srgb, var(--abyss) 60%, transparent); color: var(--ink);
+  border: 2px solid transparent; display: grid; gap: 3px; justify-items: center; font-family: var(--body);
+}
+.item .sw { width: 26px; height: 26px; border-radius: 50%; }
+.item strong { font-size: .8rem; font-weight: 800; line-height: 1.15; }
+.item span { font-size: .66rem; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.item.on { border-color: var(--glow-2); background: color-mix(in srgb, var(--glow-2) 14%, transparent); }
+.item.locked { opacity: .55; }
+.item.secret strong { color: var(--gold); }
+.items.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.item em { font-style: normal; font-size: .68rem; color: var(--muted); font-weight: 700; line-height: 1.25; }
+.custom { display: grid; gap: 8px; padding: 10px; border-radius: 14px; background: color-mix(in srgb, var(--abyss) 55%, transparent); }
+.custom .row label { display: grid; gap: 4px; justify-items: center; font-size: .72rem; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.custom input[type=color] { width: 54px; height: 40px; border: 0; border-radius: 10px; padding: 0; background: none; cursor: pointer; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.savebox { width: 100%; min-width: 0; box-sizing: border-box; font: 600 .78rem ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); background: color-mix(in srgb, var(--abyss) 70%, transparent); border: 1px solid color-mix(in srgb, var(--glow-2) 30%, transparent); border-radius: 12px; padding: 9px 12px; resize: vertical; word-break: break-all; -webkit-user-select: text; user-select: text; }
+.status { margin: 0; font-size: .82rem; font-weight: 700; color: var(--glow-2); }
+.chip { cursor: pointer; font: 800 .78rem var(--body); padding: 6px 12px; border-radius: 999px; border: 2px solid var(--gold); background: transparent; color: var(--gold); }
+.chip[aria-pressed="true"] { background: var(--gold); color: var(--abyss); }
+
+.trophies { display: grid; gap: 6px; width: 100%; text-align: left; }
+.trophy { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: center; padding: 8px 10px; border-radius: 14px; background: color-mix(in srgb, var(--abyss) 55%, transparent); }
+.trophy .medal { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-family: var(--display); font-size: .9rem; background: color-mix(in srgb, var(--ink) 12%, transparent); color: var(--muted); }
+.trophy.got .medal { background: var(--gold); color: var(--abyss); }
+.trophy.got.sec .medal { background: var(--glow); }
+.trophy strong { display: block; font-size: .9rem; }
+.trophy span { font-size: .76rem; color: var(--muted); font-weight: 700; }
+
+.final { font-family: var(--display); font-size: 3.4rem; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.stats { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.stats div { display: grid; gap: 2px; }
+.stats b { font-family: var(--display); font-size: 1.3rem; color: var(--gold); font-variant-numeric: tabular-nums; }
+.hint { font-size: .85rem; color: var(--glow-2); font-weight: 700; font-style: italic; max-width: 22rem; }
+
+.toasts { position: absolute; top: 60px; left: 0; right: 0; display: grid; justify-items: center; gap: 6px; pointer-events: none; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.toast {
+  font: 800 .9rem var(--body); color: var(--abyss); background: var(--gold);
+  padding: 8px 16px; border-radius: 999px; box-shadow: 0 6px 20px rgba(0,0,0,.35);
+  animation: pop .3s ease;
+}
+.toast.sec { background: var(--glow); }
+@keyframes pop { from { transform: translateY(-10px) scale(.9); opacity: 0; } }
+.mpbar { position: absolute; top: 18px; left: calc(max(16px, env(safe-area-inset-left, 0px)) + 74px); right: calc(max(16px, env(safe-area-inset-right, 0px)) + 140px); pointer-events: none; }
+.track { position: relative; height: 26px; border-radius: 999px; background: color-mix(in srgb, var(--deep) 75%, transparent); border: 1px solid color-mix(in srgb, var(--glow-2) 30%, transparent); }
+.track .flag { position: absolute; right: -4px; top: -4px; bottom: -4px; width: 10px; border-radius: 3px; background: repeating-conic-gradient(#fff 0 25%, #14142a 0 50%) 0 0 / 6px 6px; }
+.mk { position: absolute; top: 50%; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; border: 2px solid var(--abyss); display: grid; place-items: center; font: 800 .6rem var(--body); color: var(--abyss); transition: left .25s linear; }
+.mk.me { width: 26px; height: 26px; margin: -13px 0 0 -13px; border-color: var(--ink); z-index: 2; }
+.mk.out { opacity: .35; }
+.banner { position: absolute; left: 0; right: 0; top: 34%; text-align: center; font-family: var(--display); font-size: clamp(1.6rem, 7vw, 2.6rem); color: var(--ink); text-shadow: 0 0 20px var(--glow), 0 2px 8px rgba(5,11,36,.8); pointer-events: none; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.srv-code { font-family: var(--display); font-size: 2.4rem; letter-spacing: .14em; color: var(--gold); line-height: 1; -webkit-user-select: text; user-select: text; }
+.plist { display: grid; gap: 6px; width: 100%; text-align: left; }
+.prow { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 14px; background: color-mix(in srgb, var(--abyss) 55%, transparent); border: 2px solid transparent; }
+.prow.me { border-color: color-mix(in srgb, var(--glow-2) 60%, transparent); }
+.prow .dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 800 .7rem var(--display); color: var(--abyss); }
+.prow strong { font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prow span { font-size: .72rem; color: var(--muted); font-weight: 700; }
+.prow .kick { font: 800 .72rem var(--body); color: #ff9aa8; background: transparent; border: 1px solid color-mix(in srgb, #ff9aa8 50%, transparent); border-radius: 999px; padding: 5px 10px; cursor: pointer; }
+.prow .kick.sure { background: #ff9aa8; color: var(--abyss); }
+.prow b { font-family: var(--display); color: var(--gold); font-variant-numeric: tabular-nums; text-align: right; }
+.mpmodes { display: grid; gap: 6px; width: 100%; }
+.mpmodes .mode { grid-template-columns: 1fr; }
+.mpmodes .mode:disabled { cursor: default; }
+.servers { display: grid; gap: 6px; width: 100%; }
+.srv { cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--glow-2) 25%, transparent); background: color-mix(in srgb, var(--abyss) 55%, transparent); color: var(--ink); font: 700 .85rem var(--body); text-align: left; }
+.srv b { font-family: var(--display); color: var(--gold); letter-spacing: .08em; }
+.btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+@media (prefers-reduced-motion: reduce) { .btn, .toast, .card h1.wiggle { transition: none; animation: none; } }
+</style>
+
+<div class="stage">
+  <canvas id="game" aria-label="Jelly Drift game area"></canvas>
+
+  <div class="hud">
+    <div class="hud-left">
+      <div class="score" id="score">0</div>
+      <div class="sub" id="subline">best <b>0</b></div>
+      <div class="combo" id="combo"></div>
+      <div class="powers" id="powers"></div>
+    </div>
+    <div class="hud-right">
+      <button class="icon-btn" id="mpExit" type="button" aria-label="Leave server" hidden>✕</button>
+      <button class="icon-btn" id="musicBtn" type="button" aria-pressed="true" aria-label="Music">♫</button>
+      <button class="icon-btn" id="sfxBtn" type="button" aria-pressed="true" aria-label="Sound effects">🔊</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="menu">
+    <div class="card">
+      <h1 id="title">Jelly Drift</h1>
+      <div class="pearls"><span class="pearl-dot"></span><span id="pearlCount">0</span> coins</div>
+      <div class="tabs" role="group" aria-label="Menu sections">
+        <button class="tab" type="button" id="tab-play" aria-pressed="true">Play</button>
+        <button class="tab" type="button" id="tab-closet" aria-pressed="false">Shop</button>
+        <button class="tab" type="button" id="tab-trophies" aria-pressed="false">Trophies</button>
+        <button class="tab" type="button" id="tab-multi" aria-pressed="false">Multi</button>
+      </div>
+
+      <div class="panel" id="panel-play">
+        <p>Tap to pulse up. Dodge kelp and hooks, gobble plankton, chain combos. Your score turns into coins for the shop.</p>
+        <div class="modes" id="modes"></div>
+        <button class="btn" id="playBtn" type="button">Let's swim</button>
+        <p class="tip">tap · click · space</p>
+      </div>
+
+      <div class="panel" id="panel-closet" hidden>
+        <canvas class="preview" id="preview" width="300" height="260" aria-label="Your jelly"></canvas>
+        <div class="field">
+          <input id="nameInput" type="text" maxlength="12" placeholder="Name your jelly" autocomplete="off">
+        </div>
+        <div class="section"><div class="label">skins</div><div class="items" id="skinItems"></div>
+          <div class="custom" id="customBox" hidden>
+            <div class="label">your custom gradient</div>
+            <div class="row">
+              <label>top <input type="color" id="customA"></label>
+              <label>middle <input type="color" id="customB"></label>
+              <label>bottom <input type="color" id="customC"></label>
+            </div>
+          </div>
+        </div>
+        <div class="section"><div class="label">hats</div><div class="items" id="hatItems"></div></div>
+        <div class="section"><div class="label">faces</div><div class="items" id="faceItems"></div></div>
+        <div class="section"><div class="label">trails</div><div class="items" id="trailItems"></div></div>
+        <div class="section"><div class="label">oceans</div><div class="items" id="oceanItems"></div></div>
+        <div class="section"><div class="label">upgrades</div><div class="items two" id="upItems"></div></div>
+        <div class="section">
+          <div class="label">secret codes</div>
+          <div class="field">
+            <input id="codeInput" type="text" maxlength="12" placeholder="Type a code…" autocomplete="off" autocapitalize="characters">
+            <button class="btn small" id="codeBtn" type="button">Try</button>
+          </div>
+          <div class="chips" id="codeChips"></div>
+        </div>
+        <div class="section">
+          <div class="label">save &amp; transfer</div>
+          <p class="status" id="saveStatus">Saved on this device.</p>
+          <div class="row" style="justify-content:flex-start">
+            <button class="btn small" id="copySave" type="button">Copy save code</button>
+            <button class="btn small ghost" id="loadSave" type="button">Load save code</button>
+          </div>
+          <textarea class="savebox" id="saveBox" rows="3" placeholder="Paste a save code from your other Jelly Drift here, then tap Load save code" autocomplete="off" spellcheck="false"></textarea>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-multi" hidden>
+        <p id="mpStatus">Connecting to the reef…</p>
+        <div class="panel" id="mpActions" hidden>
+          <div class="field"><input id="mpNick" type="text" maxlength="12" placeholder="Your nickname" autocomplete="off"></div>
+          <button class="btn" id="mpCreate" type="button">Create a server</button>
+          <div class="field">
+            <input id="mpCode" type="text" maxlength="8" placeholder="Server code" autocomplete="off" autocapitalize="characters">
+            <button class="btn small" id="mpJoin" type="button">Join</button>
+          </div>
+          <div class="label">open servers</div>
+          <div class="servers" id="mpServers"></div>
+          <p class="tip">2+ jellies needed · race · survival · plankton rush</p>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-trophies" hidden>
+        <div class="label" id="trophyCount">0 / 0</div>
+        <div class="trophies" id="trophyList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="over" hidden>
+    <div class="card">
+      <h1 id="overTitle">Bonk!</h1>
+      <div class="final" id="final">0</div>
+      <div class="stats">
+        <div><span class="label">best</span><b id="overBest">0</b></div>
+        <div><span class="label">coins</span><b id="overPearls">0</b></div>
+        <div><span class="label">top combo</span><b id="overCombo">0</b></div>
+      </div>
+      <div class="hint" id="overTip"></div>
+      <div class="row">
+        <button class="btn" id="againBtn" type="button">Swim again</button>
+        <button class="btn ghost" id="menuBtn" type="button">Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mpbar" id="mpBar" hidden><div class="track" id="mpTrack"><div class="flag" id="mpFlag"></div></div></div>
+  <div class="banner" id="mpBanner" hidden></div>
+
+  <div class="overlay" id="mpLobby" hidden>
+    <div class="card">
+      <div class="label">server code</div>
+      <div class="row"><div class="srv-code" id="lobbyCode">----</div><button class="btn small ghost" id="copyCode" type="button">Copy</button></div>
+      <div class="label">game mode</div>
+      <div class="mpmodes" id="mpModes"></div>
+      <div class="row"><span class="label">rounds</span><div class="chips" id="mpRounds"></div></div>
+      <div class="label" id="lobbyCount">players</div>
+      <div class="plist" id="plist"></div>
+      <p class="hint" id="lobbyNote"></p>
+      <div class="row">
+        <button class="btn" id="mpStart" type="button">Start</button>
+        <button class="btn ghost" id="mpLeave" type="button">Leave</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="mpResults" hidden>
+    <div class="card">
+      <div class="label" id="resRound">round 1 of 3</div>
+      <h1 id="resTitle">Results</h1>
+      <div class="plist" id="resList"></div>
+      <p class="hint" id="resNote"></p>
+      <div class="row">
+        <button class="btn" id="resNext" type="button">Next round</button>
+        <button class="btn ghost" id="resLobby" type="button">Lobby</button>
+        <button class="btn ghost" id="resLeave" type="button">Leave</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+</div>
+
+<script>
+(() => {
+  // ---------- config ----------
+  const MODES = {
+    classic: { name: 'Classic', desc: 'The OG drift', speed: 1, gap: 1, pts: 1, lethal: true, timer: 0, dark: false, bpm: 88 },
+    turbo:   { name: 'Turbo', desc: 'Fast, tight, 2x points', speed: 1.5, gap: 0.9, pts: 2, lethal: true, timer: 0, dark: false, bpm: 116 },
+    zen:     { name: 'Zen', desc: 'No dying, 60 sec chill', speed: 0.9, gap: 1.15, pts: 1, lethal: false, timer: 60, dark: false, bpm: 76 },
+    dark:    { name: 'Deep Dark', desc: 'Only your glow lights the way', speed: 1, gap: 1.08, pts: 1.5, lethal: true, timer: 0, dark: true, bpm: 82 },
+  };
+  const SKINS = {
+    bubblegum: { name: 'Bubblegum', price: 0, light: '#ffe3f6', mid: '#ff8fd8', dark: '#b45cd8', glow: '255,143,216', t1: 'rgba(255,170,226,.85)', t2: 'rgba(143,243,255,.8)' },
+    ice:       { name: 'Ice', price: 0, light: '#e8fdff', mid: '#8ff3ff', dark: '#3a8fd8', glow: '143,243,255', t1: 'rgba(170,240,255,.85)', t2: 'rgba(255,255,255,.7)' },
+    lemon:     { name: 'Lemon', price: 0, light: '#fffbe0', mid: '#ffe27a', dark: '#e89a3a', glow: '255,226,122', t1: 'rgba(255,230,140,.85)', t2: 'rgba(255,170,226,.8)' },
+    lime:      { name: 'Lime', price: 0, light: '#efffe6', mid: '#9dff8f', dark: '#2fae6a', glow: '157,255,143', t1: 'rgba(180,255,170,.85)', t2: 'rgba(255,226,122,.8)' },
+    galaxy:    { name: 'Galaxy', price: 0, light: '#efe6ff', mid: '#a78bff', dark: '#3b2a8f', glow: '167,139,255', t1: 'rgba(200,180,255,.85)', t2: 'rgba(255,143,216,.8)' },
+    cotton:    { name: 'Cotton candy', price: 100, grad: ['#ffd1ea', '#e2c4ff', '#a9d4ff'], glow: '230,190,255', t1: 'rgba(255,200,235,.85)', t2: 'rgba(170,215,255,.85)' },
+    sunset:    { name: 'Sunset', price: 100, grad: ['#ffe08a', '#ff7a59', '#c43b7a'], glow: '255,122,89', t1: 'rgba(255,200,120,.85)', t2: 'rgba(255,140,170,.8)' },
+    peach:     { name: 'Peach fizz', price: 120, grad: ['#fff0e0', '#ffb38a', '#ff6f91'], glow: '255,160,140', t1: 'rgba(255,200,170,.85)', t2: 'rgba(255,255,255,.7)' },
+    mint:      { name: 'Mint', price: 150, grad: ['#eafff6', '#5ef2b0', '#1a9c78'], glow: '94,242,176', t1: 'rgba(160,255,215,.85)', t2: 'rgba(255,255,255,.7)' },
+    ocean:     { name: 'Ocean', price: 150, grad: ['#b8fbff', '#2a8fdb', '#1b2a8f'], glow: '90,190,255', t1: 'rgba(150,230,255,.85)', t2: 'rgba(90,140,255,.8)' },
+    fire:      { name: 'Fire', price: 200, grad: ['#fff3a8', '#ff9f1c', '#e63946'], glow: '255,140,40', t1: 'rgba(255,190,80,.9)', t2: 'rgba(255,90,70,.85)' },
+    toxic:     { name: 'Toxic', price: 200, grad: ['#f4ff7a', '#5aff3d', '#0b8a3a'], glow: '120,255,80', t1: 'rgba(200,255,100,.85)', t2: 'rgba(90,255,140,.8)' },
+    midnight:  { name: 'Midnight', price: 250, grad: ['#d9c2ff', '#5b3bd6', '#160b45'], glow: '140,100,255', t1: 'rgba(190,160,255,.85)', t2: 'rgba(120,200,255,.8)' },
+    custom:    { name: 'Custom', price: 300, custom: true },
+    rainbow:   { name: 'Rainbow', price: 500, secret: 'title', hint: 'The title wants attention', rainbow: true },
+    aurora:    { name: 'Aurora', price: 700, aurora: true },
+    ghost:     { name: 'Ghost', secret: 'dark30', hint: 'Score 30 in Deep Dark', light: '#ffffff', mid: '#dfe8ff', dark: '#8a9ac8', glow: '220,230,255', t1: 'rgba(230,240,255,.55)', t2: 'rgba(200,220,255,.45)', alpha: .7 },
+    gold:      { name: 'Gold', secret: 'gold10', hint: 'Eat 10 golden plankton', light: '#fff7cc', mid: '#ffcf3f', dark: '#b8860b', glow: '255,207,63', t1: 'rgba(255,220,120,.9)', t2: 'rgba(255,255,255,.75)' },
+  };
+  const HATS = {
+    none:       { name: 'No hat', price: 0, sw: 'transparent' },
+    flower:     { name: 'Flower', price: 40, sw: '#ff8fc4' },
+    bow:        { name: 'Bow', price: 40, sw: '#ff4f9a' },
+    party:      { name: 'Party hat', price: 60, sw: '#5ad1ff' },
+    catears:    { name: 'Cat ears', price: 70, sw: '#ffb3d1' },
+    shades:     { name: 'Shades', price: 80, sw: '#1b1b2f' },
+    headphones: { name: 'Headphones', price: 90, sw: '#7a5cff' },
+    chef:       { name: 'Chef hat', price: 90, sw: '#ffffff' },
+    horns:      { name: 'Devil horns', price: 100, sw: '#ff3d3d' },
+    propeller:  { name: 'Propeller', price: 110, sw: '#ff5a5f' },
+    cowboy:     { name: 'Cowboy', price: 120, sw: '#a8653a' },
+    tophat:     { name: 'Top hat', price: 140, sw: '#222233' },
+    halo:       { name: 'Halo', price: 160, sw: '#ffe27a' },
+    viking:     { name: 'Viking', price: 180, sw: '#9aa4b8' },
+    crown:      { name: 'Crown', price: 250, sw: '#ffcf3f' },
+    wizard:     { name: 'Wizard', secret: 'poke', hint: 'The menu jelly is ticklish', sw: '#7a4cff' },
+  };
+  const FACES = {
+    normal: { name: 'Smiley', price: 0, sw: '#ffe27a' },
+    kawaii: { name: 'Kawaii', price: 40, sw: '#ffb3d1' },
+    sleepy: { name: 'Sleepy', price: 40, sw: '#9fb3d9' },
+    wink:   { name: 'Wink', price: 50, sw: '#8ff3ff' },
+    angry:  { name: 'Grumpy', price: 60, sw: '#ff6b6b' },
+    derp:   { name: 'Derp', price: 80, sw: '#9dff8f' },
+    stars:  { name: 'Star eyes', price: 120, sw: '#ffd23f' },
+    hearts: { name: 'Heart eyes', price: 150, sw: '#ff3d7f' },
+  };
+  const TRAILS = {
+    none:     { name: 'None', price: 0, sw: 'transparent' },
+    bubbles:  { name: 'Bubbles', price: 0, sw: '#cfe9ff' },
+    sparkles: { name: 'Sparkles', price: 50, sw: '#fff3a0' },
+    snow:     { name: 'Snow', price: 60, sw: '#ffffff' },
+    hearts:   { name: 'Hearts', price: 70, sw: '#ff6eaa' },
+    fire:     { name: 'Fire', price: 90, sw: 'linear-gradient(#ffe08a,#ff6b3d)' },
+    notes:    { name: 'Music', price: 110, sw: '#a78bff' },
+    coins:    { name: 'Coins', price: 130, sw: '#ffd23f' },
+    galaxy:   { name: 'Galaxy', price: 150, sw: 'linear-gradient(#a78bff,#ff8fd8)' },
+    rainbow:  { name: 'Rainbow', price: 200, sw: 'conic-gradient(#ff6b6b,#ffd93d,#6bff95,#6bc5ff,#c56bff,#ff6b6b)' },
+    stars:    { name: 'Stars', secret: 'combo10', hint: 'Hit a 10 combo', sw: '#ffe27a' },
+  };
+  const OCEANS = {
+    deep:     { name: 'Deep blue', price: 0, bg: ['#123a7a', '#0b1d4a', '#050b24'], ray: '143,243,255', kelp: ['#2fbf7a', '#1b8a55', '#4fe39a'], sand: ['#c9a868', '#e8c98a'] },
+    reef:     { name: 'Sunset reef', price: 150, bg: ['#ff9a6b', '#a8457a', '#2a1240'], ray: '255,210,150', kelp: ['#ff7a8a', '#c2405a', '#ffb0b8'], sand: ['#d9a46a', '#f2c98a'] },
+    lagoon:   { name: 'Toxic lagoon', price: 150, bg: ['#3a7a1a', '#123a14', '#04140a'], ray: '200,255,120', kelp: ['#b84fff', '#7a2ab8', '#d89aff'], sand: ['#6a7a3a', '#8a9a4a'] },
+    candy:    { name: 'Candy sea', price: 200, bg: ['#ff9fd6', '#b37dff', '#4a2f96'], ray: '255,255,255', kelp: ['#5ad1ff', '#2a8fdb', '#a8ecff'], sand: ['#ffd6a5', '#fff0c8'] },
+    midnight: { name: 'Midnight', price: 200, bg: ['#2a1a5a', '#120a33', '#04020f'], ray: '190,150,255', kelp: ['#3fd9c4', '#1f8f82', '#8ff3e4'], sand: ['#3a3060', '#5a4a8a'] },
+    arctic:   { name: 'Arctic', price: 250, bg: ['#7cc4ea', '#3f86c4', '#173d75'], ray: '255,255,255', kelp: ['#4fa8ff', '#2a6fc4', '#bfe6ff'], sand: ['#dfeeff', '#ffffff'] },
+  };
+  const UPS = {
+    magnet: { name: 'Magnet+', desc: 'Magnets last longer', prices: [100, 250, 500], sw: '#ff7a8a' },
+    slow:   { name: 'Slow-mo+', desc: 'Slow-mo lasts longer', prices: [100, 250, 500], sw: '#ffe27a' },
+    luck:   { name: 'Lucky', desc: 'More power-ups and golden plankton', prices: [150, 350, 700], sw: '#9dff8f' },
+    coins:  { name: 'Coin boost', desc: 'Earn x1.5, then x2 coins', prices: [400, 1000], sw: '#ffd23f' },
+    shield: { name: 'Head start', desc: 'Start every run with a shield', prices: [400], sw: '#8ff3ff' },
+    revive: { name: 'Second wind', desc: 'Survive one crash every run', prices: [800], sw: '#ff8fd8' },
+  };
+  const CODES = { DISCO: 'Disco ocean', SQUISH: 'Giant jelly', TINY: 'Tiny jelly', MOON: 'Moon gravity' };
+  const POWERS = { shield: { label: 'Shield', color: '#8ff3ff' }, magnet: { label: 'Magnet', color: '#ff7a8a' }, slow: { label: 'Slow-mo', color: '#ffe27a' }, revive: { label: '2nd wind', color: '#9dff8f' } };
+  const ACH = [
+    { id: 'first', name: 'First drift', desc: 'Play a round' },
+    { id: 'c10', name: 'Getting wiggly', desc: 'Score 10 in Classic' },
+    { id: 'c25', name: 'Kelp dodger', desc: 'Score 25 in Classic' },
+    { id: 'c50', name: 'Jelly legend', desc: 'Score 50 in Classic' },
+    { id: 'turbo20', name: 'Zoomies', desc: 'Score 20 in Turbo' },
+    { id: 'zen', name: 'Inner peace', desc: 'Finish a Zen round' },
+    { id: 'combo5', name: 'Snack chain', desc: 'Hit a 5 combo' },
+    { id: 'shield', name: 'Saved by the bubble', desc: 'Let a shield take a hit' },
+    { id: 'allmodes', name: 'Explorer', desc: 'Play every mode' },
+    { id: 'shopper', name: 'Drip check', desc: 'Buy something in the closet' },
+    { id: 'rich', name: 'Coin hoarder', desc: 'Hold 1000 coins at once' },
+    { id: 'collector', name: 'Collector', desc: 'Own 15 shop items' },
+    { id: 'drip', name: 'Full drip', desc: 'Wear a hat, face, trail and paid skin at once' },
+    { id: 'title', secret: true, name: 'Title tapper', desc: 'Tapped the title 5 times' },
+    { id: 'poke', secret: true, name: 'Stop poking me', desc: 'Poked the menu jelly a lot' },
+    { id: 'dark30', secret: true, name: 'Night light', desc: 'Scored 30 in Deep Dark' },
+    { id: 'gold10', secret: true, name: 'Midas jelly', desc: 'Ate 10 golden plankton' },
+    { id: 'combo10', secret: true, name: 'Combo god', desc: 'Hit a 10 combo' },
+    { id: 'whale', secret: true, name: 'Whale hello there', desc: 'Spotted the rare whale' },
+    { id: 'code', secret: true, name: 'Hacker jelly', desc: 'Entered a secret code' },
+    { id: 'nice', secret: true, name: 'Very specific', desc: 'Ended a run on exactly 42' },
+  ];
+  const TIPS = [
+    'tip: magnets pull golden plankton too',
+    'psst… the title likes being tapped',
+    'the menu jelly is super ticklish',
+    'legend says a whale swims these waters',
+    'code hint: what makes the ocean dance? D _ _ _ O',
+    'code hint: the opposite of huge',
+    'code hint: gravity is lighter up there',
+    'code hint: what you do to a squishy toy',
+    'tip: combos go up to x5 and multiply everything',
+    'tip: orange bobbers mean the hook moves',
+    'every trophy pays 25 coins',
+    'tip: your whole score turns into coins',
+    'tip: Second wind in the shop saves you from one crash',
+    'tip: the Custom skin lets you mix your own gradient',
+  ];
+
+  // ---------- storage ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('jd_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('jd_' + k, JSON.stringify(v)); } catch (e) {} },
+  };
+  let bests = Object.assign({ classic: 0, turbo: 0, zen: 0, dark: 0 }, store.get('bests', {}));
+  let modeKey = store.get('mode', 'classic'); if (!MODES[modeKey]) modeKey = 'classic';
+  let skinKey = store.get('skin', 'bubblegum'); if (!SKINS[skinKey]) skinKey = 'bubblegum';
+  let musicOn = store.get('music', true), sfxOn = store.get('sfx', true);
+  const save = Object.assign({ pearls: 0, owned: {}, hat: 'none', trail: 'bubbles', face: 'normal', ocean: 'deep', up: {}, custom: ['#ff8fd8', '#a78bff', '#8ff3ff'], ach: {}, gold: 0, played: {}, name: '', codes: {}, found: [] }, store.get('save', {}));
+  for (const k of ['skin', 'hat', 'trail', 'face', 'ocean']) save.owned[k] = save.owned[k] || [];
+  save.up = save.up || {}; save.face = save.face || 'normal'; save.ocean = save.ocean || 'deep'; save.custom = save.custom || ['#ff8fd8', '#a78bff', '#8ff3ff'];
+  if (!HATS[save.hat]) save.hat = 'none'; if (!TRAILS[save.trail]) save.trail = 'bubbles';
+  let cloudDoc = null, cloudBusy = false, cloudDirty = false, cloudT = null;
+  const persist = () => { store.set('save', save); store.set('savedAt', Date.now()); queueCloud(); };
+
+  // ---------- DOM ----------
+  const $ = id => document.getElementById(id);
+  const cv = $('game'), ctx = cv.getContext('2d');
+  const pv = $('preview'), pctx = pv.getContext('2d');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- state ----------
+  let W = 0, H = 0, DPR = 1;
+  const jelly = { x: 0, y: 0, vy: 0, r: 22, squish: 0, phase: 0, inv: 0, flash: 0 };
+  let gates = [], plankton = [], powerups = [], pops = [], texts = [], bubbles = [], whales = [];
+  let state = 'menu', score = 0, speed = 0, spawnT = 0, t = 0, shake = 0, trailT = 0;
+  let combo = 0, topCombo = 0, comboT = 0, runPearls = 0, timeLeft = 0, pokes = 0, titleTaps = 0, typed = '';
+  let active = { shield: false, magnet: 0, slow: 0 };
+  let room = null, mp = null, race = null, hostPeer = null, meIsHost = false, myReady = false;
+  let mpRun = null, mpStartAt = 0, mpNext = 0, mpIdx = 0, finishWx = 0, rngFn = Math.random;
+  let seenEpoch = -1, shownResults = -1, pushT = 0, firstDoneAt = 0, graceAt = 0, mpPlaceText = '', barT = 0;
+  for (let i = 0; i < 45; i++) bubbles.push({ x: Math.random(), y: Math.random(), r: Math.random() * 2.5 + .5, s: Math.random() * .3 + .1 });
+  const M = () => MODES[modeKey];
+  const S = () => Math.min(W, H) / 600;
+  const rMul = () => save.codes.SQUISH ? 1.5 : save.codes.TINY ? 0.62 : 1;
+  const gMul = () => save.codes.MOON ? 0.55 : 1;
+  const OC = () => OCEANS[save.ocean] || OCEANS.deep;
+  const lv = k => save.up[k] || 0;
+
+  // ---------- toasts & achievements ----------
+  function toast(msg, sec) {
+    const el = document.createElement('div');
+    el.className = 'toast' + (sec ? ' sec' : ''); el.textContent = msg;
+    $('toasts').appendChild(el);
+    setTimeout(() => el.remove(), 2600);
+  }
+  function unlock(id) {
+    if (save.ach[id]) return;
+    const a = ACH.find(x => x.id === id); if (!a) return;
+    save.ach[id] = true; save.pearls += 25; persist();
+    toast((a.secret ? 'Secret found: ' : 'Trophy: ') + a.name + '  +25 coins', a.secret);
+    sfx.power(); renderAll();
+  }
+
+  // ---------- menu UI ----------
+  const modesEl = $('modes');
+  for (const [k, m] of Object.entries(MODES)) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'mode'; b.id = 'mode-' + k; b.dataset.k = k;
+    b.innerHTML = `<strong>${m.name}</strong><span>${m.desc}</span><em></em>`;
+    b.onclick = () => { modeKey = k; store.set('mode', k); renderAll(); sfx.tick(); };
+    modesEl.appendChild(b);
+  }
+
+  const TABLES = { skin: SKINS, hat: HATS, face: FACES, trail: TRAILS, ocean: OCEANS };
+  const worn = kind => kind === 'skin' ? skinKey : save[kind];
+  function equip(kind, k) { if (kind === 'skin') { skinKey = k; store.set('skin', k); } else save[kind] = k; persist(); }
+  function unlocked(kind, k) { const it = TABLES[kind][k]; return it.price === 0 || save.owned[kind].includes(k) || !!(it.secret && save.ach[it.secret]); }
+  function swatch(kind, k) {
+    const it = TABLES[kind][k];
+    if (kind === 'ocean') return `linear-gradient(${it.bg.join(',')})`;
+    if (kind !== 'skin') return it.sw;
+    if (it.rainbow) return 'conic-gradient(#ff8fd8,#ffe27a,#9dff8f,#8ff3ff,#a78bff,#ff8fd8)';
+    if (it.aurora) return 'linear-gradient(135deg,#5ef2b0,#6bc5ff,#a78bff,#ff8fd8)';
+    if (it.custom) return `linear-gradient(${save.custom.join(',')})`;
+    if (it.grad) return `linear-gradient(${it.grad.join(',')})`;
+    return `radial-gradient(circle at 35% 30%, ${it.light}, ${it.mid} 55%, ${it.dark})`;
+  }
+  function checkStyle() {
+    const n = Object.values(save.owned).reduce((a, b) => a + b.length, 0) + Object.values(save.up).reduce((a, b) => a + b, 0);
+    if (n >= 15) unlock('collector');
+    if (save.hat !== 'none' && save.face !== 'normal' && save.trail !== 'none' && save.trail !== 'bubbles' && SKINS[skinKey].price > 0) unlock('drip');
+  }
+
+  function itemButton({ id, name, sw, sub, desc, on, locked, secret, onClick }) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.id = id;
+    b.className = 'item' + (on ? ' on' : '') + (locked ? ' locked' : '') + (secret ? ' secret' : '');
+    b.innerHTML = `<div class="sw"></div><strong></strong><span></span>`;
+    b.querySelector('.sw').style.background = sw;
+    if (sw === 'transparent') b.querySelector('.sw').style.border = '2px dashed rgba(238,246,255,.3)';
+    b.querySelector('strong').textContent = name;
+    b.querySelector('span').textContent = sub;
+    if (desc) { const em = document.createElement('em'); em.textContent = desc; b.appendChild(em); }
+    b.onclick = onClick;
+    return b;
+  }
+
+  function renderCloset() {
+    for (const kind of Object.keys(TABLES)) {
+      const el = $(kind + 'Items'); el.innerHTML = '';
+      for (const [k, it] of Object.entries(TABLES[kind])) {
+        const ok = unlocked(kind, k), on = worn(kind) === k, hidden = it.secret && it.price == null && !ok;
+        const sub = on ? 'wearing' : ok ? 'owned' : it.price != null ? it.price + ' coins' : 'secret';
+        el.appendChild(itemButton({
+          id: kind + '-' + k, name: hidden ? '???' : it.name, sw: hidden ? '#2a3560' : swatch(kind, k),
+          sub, on, locked: !ok, secret: !!it.secret,
+          onClick: () => {
+            if (ok) { equip(kind, k); sfx.tick(); checkStyle(); return renderAll(); }
+            if (it.price == null) { toast('Hint: ' + it.hint, true); sfx.tick(); return; }
+            if (save.pearls < it.price) { toast(`Need ${it.price - save.pearls} more coins` + (it.secret ? ' (or find the secret)' : '')); sfx.bonk(); return; }
+            save.pearls -= it.price; save.owned[kind].push(k); equip(kind, k); sfx.power();
+            toast('Got ' + it.name + '!'); unlock('shopper'); checkStyle(); renderAll();
+          }
+        }));
+      }
+    }
+    const cb = $('customBox'); cb.hidden = !unlocked('skin', 'custom');
+    ['customA', 'customB', 'customC'].forEach((id, i) => { if (document.activeElement !== $(id)) $(id).value = save.custom[i]; });
+    const ue = $('upItems'); ue.innerHTML = '';
+    for (const [k, u] of Object.entries(UPS)) {
+      const l = lv(k), max = u.prices.length, maxed = l >= max;
+      ue.appendChild(itemButton({
+        id: 'up-' + k, name: u.name + (max > 1 ? ` ${l}/${max}` : ''), sw: u.sw, desc: u.desc,
+        sub: maxed ? (max > 1 ? 'maxed' : 'owned') : u.prices[l] + ' coins', on: maxed, locked: false, secret: false,
+        onClick: () => {
+          if (maxed) { toast(u.name + ' is maxed out'); sfx.tick(); return; }
+          const price = u.prices[l];
+          if (save.pearls < price) { toast(`Need ${price - save.pearls} more coins`); sfx.bonk(); return; }
+          save.pearls -= price; save.up[k] = l + 1; persist(); sfx.power();
+          toast(max > 1 ? `${u.name} level ${l + 1}!` : `${u.name} unlocked!`); unlock('shopper'); checkStyle(); renderAll();
+        }
+      }));
+    }
+    const chips = $('codeChips'); chips.innerHTML = '';
+    if (!save.found.length) { chips.innerHTML = '<span class="tip" style="color:var(--muted)">no codes yet… check the game over tips</span>'; }
+    for (const c of save.found) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'chip'; b.id = 'code-' + c;
+      b.textContent = CODES[c]; b.setAttribute('aria-pressed', !!save.codes[c]);
+      b.onclick = () => {
+        save.codes[c] = !save.codes[c];
+        if (c === 'SQUISH' && save.codes[c]) save.codes.TINY = false;
+        if (c === 'TINY' && save.codes[c]) save.codes.SQUISH = false;
+        persist(); sfx.tick(); renderAll();
+      };
+      chips.appendChild(b);
+    }
+  }
+
+  function renderTrophies() {
+    const list = $('trophyList'); list.innerHTML = '';
+    const got = ACH.filter(a => save.ach[a.id]).length;
+    $('trophyCount').textContent = `${got} / ${ACH.length} trophies`;
+    for (const a of ACH) {
+      const has = !!save.ach[a.id];
+      const d = document.createElement('div');
+      d.className = 'trophy' + (has ? ' got' : '') + (a.secret ? ' sec' : '');
+      d.innerHTML = `<div class="medal">${has ? '★' : a.secret ? '?' : '·'}</div><div><strong></strong><span></span></div>`;
+      d.querySelector('strong').textContent = has || !a.secret ? a.name : 'Secret';
+      d.querySelector('span').textContent = has || !a.secret ? a.desc : 'Keep exploring to find this one';
+      list.appendChild(d);
+    }
+  }
+
+  function renderAll() {
+    for (const b of modesEl.children) {
+      b.setAttribute('aria-pressed', b.dataset.k === modeKey);
+      b.querySelector('em').textContent = 'best ' + (bests[b.dataset.k] || 0);
+    }
+    $('pearlCount').textContent = save.pearls;
+    if (save.pearls >= 1000 && !save.ach.rich) setTimeout(() => unlock('rich'), 0);
+    renderCloset(); renderTrophies(); setSub();
+  }
+  function setSub() {
+    if (mp && mpRun && state === 'play') { $('subline').innerHTML = mpPlaceText; return; }
+    $('subline').innerHTML = M().timer && state === 'play'
+      ? `time <b>${Math.ceil(timeLeft)}</b>` : `best <b>${bests[modeKey] || 0}</b>`;
+  }
+
+  let tab = 'play';
+  function showTab(k) {
+    tab = k;
+    for (const n of ['play', 'closet', 'trophies', 'multi']) {
+      $('tab-' + n).setAttribute('aria-pressed', n === k);
+      $('panel-' + n).hidden = n !== k;
+    }
+  }
+  for (const n of ['play', 'closet', 'trophies', 'multi']) $('tab-' + n).onclick = () => { showTab(n); sfx.tick(); };
+
+  ['customA', 'customB', 'customC'].forEach((id, i) => $(id).addEventListener('input', e => { save.custom[i] = e.target.value; persist(); }));
+  ['customA', 'customB', 'customC'].forEach(id => $(id).addEventListener('change', () => renderAll()));
+  $('nameInput').value = save.name;
+  $('nameInput').addEventListener('input', e => { save.name = e.target.value.slice(0, 12); persist(); $('mpNick').value = save.name; });
+  function tryCode() {
+    const v = $('codeInput').value.trim().toUpperCase();
+    const GIFTS = { BESTIE: 500, SUNDAY: 250, JELLYFISH: 300 };
+    save.redeemed = save.redeemed || [];
+    if (GIFTS[v]) {
+      if (save.redeemed.includes(v)) { toast('Already redeemed ' + v); sfx.bonk(); }
+      else { save.redeemed.push(v); save.pearls += GIFTS[v]; persist(); sfx.power(); toast(`${v} redeemed! +${GIFTS[v]} coins`, true); unlock('code'); renderAll(); }
+      $('codeInput').value = ''; return;
+    }
+    if (CODES[v]) {
+      if (!save.found.includes(v)) { save.found.push(v); toast('Code unlocked: ' + CODES[v], true); }
+      else toast(CODES[v] + ' is already yours');
+      save.codes[v] = true;
+      if (v === 'SQUISH') save.codes.TINY = false;
+      if (v === 'TINY') save.codes.SQUISH = false;
+      persist(); sfx.power(); unlock('code'); renderAll();
+    } else if (v) { toast('Nope, not a code'); sfx.bonk(); }
+    $('codeInput').value = '';
+  }
+  $('codeBtn').onclick = tryCode;
+  $('codeInput').addEventListener('keydown', e => { if (e.key === 'Enter') tryCode(); });
+
+  $('title').onclick = () => {
+    titleTaps++; const h = $('title'); h.classList.remove('wiggle'); void h.offsetWidth; h.classList.add('wiggle'); sfx.tick();
+    if (titleTaps >= 5) unlock('title');
+  };
+
+  function setToggle(btn, on) { btn.setAttribute('aria-pressed', on); }
+  setToggle($('musicBtn'), musicOn); setToggle($('sfxBtn'), sfxOn);
+
+  // ---------- audio ----------
+  let ac = null, master, musicGain, sfxGain, noiseBuf;
+  function initAudio() {
+    if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+    try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+    master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination);
+    musicGain = ac.createGain(); musicGain.gain.value = musicOn ? 0.5 : 0; musicGain.connect(master);
+    sfxGain = ac.createGain(); sfxGain.gain.value = sfxOn ? 0.7 : 0; sfxGain.connect(master);
+    noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    startMusic();
+  }
+  document.addEventListener('pointerdown', initAudio, { once: true });
+  const mtof = n => 440 * Math.pow(2, (n - 69) / 12);
+  function tone(dest, { f, f2, type = 'sine', t = ac.currentTime, a = .005, dur = .2, vol = .3, lp }) {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    let node = o;
+    if (lp) { const fl = ac.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = lp; o.connect(fl); node = fl; }
+    node.connect(g); g.connect(dest); o.start(t); o.stop(t + dur + .05);
+  }
+  function noise(dest, { t = ac.currentTime, dur = .1, vol = .2, type = 'highpass', freq = 6000 }) {
+    const s = ac.createBufferSource(), g = ac.createGain(), fl = ac.createBiquadFilter();
+    s.buffer = noiseBuf; fl.type = type; fl.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(fl); fl.connect(g); g.connect(dest); s.start(t); s.stop(t + dur + .02);
+  }
+  const sfx = {
+    ok: () => ac && sfxOn,
+    tick() { if (this.ok()) tone(sfxGain, { f: 880, dur: .06, vol: .12, type: 'triangle' }); },
+    pulse() { if (this.ok()) { const p = save.codes.TINY ? 1.6 : save.codes.SQUISH ? .6 : 1; tone(sfxGain, { f: 260 * p, f2: 520 * p, dur: .14, vol: .22 }); noise(sfxGain, { dur: .08, vol: .05, type: 'bandpass', freq: 1200 }); } },
+    collect(c) { if (!this.ok()) return; const base = 76 + Math.min(c, 12); const t = ac.currentTime; tone(sfxGain, { f: mtof(base), dur: .12, vol: .2, type: 'triangle', t }); tone(sfxGain, { f: mtof(base + 7), dur: .18, vol: .16, t: t + .06 }); },
+    pass() { if (this.ok()) tone(sfxGain, { f: 1320, dur: .05, vol: .06 }); },
+    power() { if (!this.ok()) return; const t = ac.currentTime; [72, 76, 79, 84].forEach((n, i) => tone(sfxGain, { f: mtof(n), dur: .15, vol: .16, type: 'square', lp: 2500, t: t + i * .06 })); },
+    shieldPop() { if (this.ok()) { noise(sfxGain, { dur: .25, vol: .3, freq: 3000 }); tone(sfxGain, { f: 900, f2: 200, dur: .25, vol: .15 }); } },
+    hit() { if (this.ok()) { tone(sfxGain, { f: 200, f2: 50, dur: .4, vol: .4, type: 'sawtooth', lp: 900 }); noise(sfxGain, { dur: .3, vol: .25, type: 'lowpass', freq: 1500 }); } },
+    bonk() { if (this.ok()) tone(sfxGain, { f: 330, f2: 140, dur: .18, vol: .25, type: 'triangle' }); },
+    whale() { if (this.ok()) tone(sfxGain, { f: 180, f2: 320, dur: 1.4, vol: .18, a: .4, type: 'sine' }); },
+    lose() { if (!this.ok()) return; const t = ac.currentTime + .25; [67, 64, 60, 55].forEach((n, i) => tone(sfxGain, { f: mtof(n), dur: .3, vol: .15, type: 'triangle', t: t + i * .14 })); },
+    win() { if (!this.ok()) return; const t = ac.currentTime + .2; [60, 64, 67, 72, 76].forEach((n, i) => tone(sfxGain, { f: mtof(n), dur: .3, vol: .15, type: 'triangle', t: t + i * .09 })); },
+  };
+  const CHORDS = [[53, 57, 60, 64], [52, 55, 59, 62], [50, 53, 57, 60], [48, 52, 55, 59]];
+  const ROOTS = [41, 40, 38, 36];
+  const MEL = [72, null, 69, null, 67, null, 69, null, null, 71, null, 67, 64, null, null, null];
+  let step = 0, nextTime = 0, musicTimer = null;
+  const bpm = () => (state === 'play' || state === 'over') ? MODES[modeKey].bpm * (save.codes.DISCO ? 1.15 : 1) : 80;
+  function startMusic() { if (musicTimer) return; nextTime = ac.currentTime + .1; musicTimer = setInterval(schedule, 25); }
+  function schedule() {
+    while (nextTime < ac.currentTime + .12) {
+      const sixteenth = 60 / bpm() / 4;
+      const bar = Math.floor(step / 16) % 4, s = step % 16, t = nextTime;
+      const live = state === 'play' || state === 'over';
+      if (s === 0 || s === 6) CHORDS[bar].forEach((n, i) => tone(musicGain, { f: mtof(n), type: 'triangle', t: t + i * .01, a: .02, dur: s === 0 ? 1.4 : .9, vol: .06, lp: 1600 }));
+      if (live) {
+        if (s === 0 || s === 8 || s === 10) tone(musicGain, { f: mtof(ROOTS[bar] + (s === 10 ? 7 : 0)), t, dur: .35, vol: .22 });
+        if (s === 0 || s === 10 || (save.codes.DISCO && s % 4 === 0)) tone(musicGain, { f: 140, f2: 45, t, dur: .25, vol: .45 });
+        if (s === 4 || s === 12) noise(musicGain, { t, dur: .14, vol: .12, type: 'bandpass', freq: 1800 });
+        if (s % 2 === 0) noise(musicGain, { t: t + (s % 4 === 2 ? sixteenth * .2 : 0), dur: .03, vol: .04 });
+        const m = MEL[s]; if (m && bar % 2 === 1) tone(musicGain, { f: mtof(m), t, dur: .35, vol: .07 });
+      } else if (s % 4 === 0) noise(musicGain, { t, dur: .03, vol: .025 });
+      nextTime += sixteenth; step++;
+    }
+  }
+  $('musicBtn').onclick = () => { musicOn = !musicOn; store.set('music', musicOn); setToggle($('musicBtn'), musicOn); initAudio(); if (musicGain) musicGain.gain.setTargetAtTime(musicOn ? .5 : 0, ac.currentTime, .05); };
+  $('sfxBtn').onclick = () => { sfxOn = !sfxOn; store.set('sfx', sfxOn); setToggle($('sfxBtn'), sfxOn); initAudio(); if (sfxGain) sfxGain.gain.setTargetAtTime(sfxOn ? .7 : 0, ac.currentTime, .05); sfx.tick(); };
+
+  // ---------- canvas ----------
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize); resize();
+
+  // ---------- game flow ----------
+  function reset() {
+    const s = S();
+    jelly.x = W * 0.28; jelly.y = H * 0.45; jelly.vy = 0; jelly.r = 22 * s * rMul(); jelly.squish = 0; jelly.inv = 0; jelly.flash = 0;
+    gates = []; plankton = []; powerups = []; pops = []; texts = []; whales = [];
+    score = 0; spawnT = 0; combo = 0; topCombo = 0; comboT = 0; runPearls = 0;
+    timeLeft = M().timer;
+    active = { shield: false, magnet: 0, slow: 0, revive: false };
+    updateHud();
+  }
+  const mult_ = () => Math.min(5, 1 + Math.floor(combo / 3));
+  function updateHud() {
+    $('score').textContent = score; setSub();
+    const mult = mult_();
+    $('combo').textContent = combo >= 2 ? `combo ${combo}${mult > 1 ? ' · x' + mult : ''}` : '';
+    const p = [];
+    if (active.shield) p.push(['shield']);
+    if (active.revive) p.push(['revive']);
+    if (active.magnet > 0) p.push(['magnet', active.magnet]);
+    if (active.slow > 0) p.push(['slow', active.slow]);
+    $('powers').innerHTML = p.map(([k, v]) => `<span class="pw" style="background:${POWERS[k].color}">${POWERS[k].label}${v ? ' ' + Math.ceil(v / 60) : ''}</span>`).join('');
+  }
+
+  function start() {
+    initAudio(); state = 'play'; reset();
+    if (lv('shield')) active.shield = true;
+    if (lv('revive')) active.revive = true;
+    $('menu').hidden = true; $('over').hidden = true;
+    pulse();
+  }
+  function pulse() {
+    if (state !== 'play') return;
+    if (mp && mpRun && (Date.now() < mpStartAt || mpRun.done || !mpRun.alive)) return;
+    jelly.vy = -7.2 * S() * (save.codes.MOON ? .75 : 1); jelly.squish = 1; sfx.pulse();
+    for (let i = 0; i < 3; i++) pops.push({ x: jelly.x + (Math.random() - .5) * jelly.r, y: jelly.y + jelly.r, vx: (Math.random() - .5) * S(), vy: 1.5 * S(), life: .8, c: '200,235,255', r: 2.5 });
+  }
+  function addText(x, y, msg, color = '#ffe27a') { texts.push({ x, y, msg, color, life: 1 }); }
+  function burst(x, y, c, n) {
+    for (let i = 0; i < n; i++) { const a = Math.random() * 7, v = (Math.random() * 3 + 1) * S(); pops.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, c, r: 3 }); }
+  }
+
+  function hurt() {
+    if (state !== 'play' || jelly.inv > 0) return;
+    if (active.shield) {
+      active.shield = false; jelly.inv = 60; shake = 6; sfx.shieldPop();
+      addText(jelly.x, jelly.y - jelly.r * 2, 'shield popped!', '#8ff3ff');
+      burst(jelly.x, jelly.y, '143,243,255', 18); unlock('shield'); updateHud(); return;
+    }
+    if (!mpOn() && !M().lethal) {
+      jelly.inv = 60; jelly.flash = 1; shake = 5; sfx.bonk();
+      combo = 0; score = Math.max(0, score - 3);
+      addText(jelly.x, jelly.y - jelly.r * 2, '-3 bonk', '#ff9aa8'); updateHud(); return;
+    }
+    if (active.revive) {
+      active.revive = false; jelly.inv = 90; jelly.vy = -8 * S(); shake = 8; sfx.shieldPop(); combo = 0;
+      addText(jelly.x, jelly.y - jelly.r * 2, 'second wind!', '#9dff8f');
+      burst(jelly.x, jelly.y, '157,255,143', 20); updateHud(); return;
+    }
+    if (mpOn()) { mpCrash(); return; }
+    end(false);
+  }
+
+  function end(timeUp) {
+    if (state !== 'play') return;
+    state = 'over'; shake = timeUp ? 0 : 12; overTimeUp = timeUp;
+    const isBest = score > (bests[modeKey] || 0);
+    if (isBest) { bests[modeKey] = score; store.set('bests', bests); }
+    const earned = Math.round((score + runPearls) * [1, 1.5, 2][lv('coins')]);
+    save.pearls += earned; save.played[modeKey] = true; persist();
+    (timeUp || isBest) ? sfx.win() : (sfx.hit(), sfx.lose());
+    setTimeout(() => {
+      unlock('first');
+      if (modeKey === 'classic') { if (score >= 10) unlock('c10'); if (score >= 25) unlock('c25'); if (score >= 50) unlock('c50'); }
+      if (modeKey === 'turbo' && score >= 20) unlock('turbo20');
+      if (modeKey === 'zen' && timeUp) unlock('zen');
+      if (modeKey === 'dark' && score >= 30) unlock('dark30');
+      if (score === 42) unlock('nice');
+      if (Object.keys(MODES).every(k => save.played[k])) unlock('allmodes');
+      $('overTitle').textContent = isBest && score > 0 ? 'New best!!' : timeUp ? "Time's up!" : ['Bonk!', 'Oof!', 'Tangled!', 'Splat!', 'Jelly down!'][Math.floor(Math.random() * 5)];
+      $('final').textContent = score;
+      $('overBest').textContent = bests[modeKey];
+      $('overPearls').textContent = '+' + earned;
+      $('overCombo').textContent = topCombo;
+      $('overTip').textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
+      $('over').hidden = false; $('againBtn').focus();
+      renderAll(); updateHud();
+    }, timeUp ? 300 : 650);
+  }
+  let overTimeUp = false;
+
+  function spawnGate(x0, idx) {
+    const s = S(), m = mp ? MODES.classic : M(), w = 46 * s;
+    if (x0 == null) x0 = W + w;
+    const diff = mp ? idx * 2 : score / m.pts;
+    const gap = Math.max(150 * s, (215 * s - diff * 1.5 * s)) * m.gap * (save.codes.SQUISH ? 1.2 : 1);
+    const margin = 70 * s, floor = H - 40 * s;
+    const top = margin + rnd() * Math.max(10, floor - margin * 2 - gap);
+    const mv = rnd();
+    gates.push({ x: x0, w, top, bottom: top + gap, passed: false, sway: rnd() * 6, bob: rnd() * 6, moving: (mp ? idx > 6 : score > 15) && mv < .35 });
+    const midY = top + gap / 2, luck = mp ? 0 : lv('luck');
+    if (rnd() < .14 + (m.timer ? .06 : 0) + .05 * luck) {
+      const keys = mp ? ['shield', 'magnet', 'revive'] : Object.keys(POWERS);
+      powerups.push({ x: x0 - w / 2, y: midY, k: keys[Math.floor(rnd() * keys.length)], p: rnd() * 6 });
+    } else if (rnd() < .8) {
+      const n = 1 + Math.floor(rnd() * 3);
+      for (let i = 0; i < n; i++) plankton.push({ x: x0 - w / 2 + i * 26 * s, y: midY + Math.sin(i) * gap * .15, p: rnd() * 6, gold: rnd() < .08 + .04 * luck });
+    }
+    if (rnd() < .45) {
+      const yy = margin + rnd() * (floor - margin * 2);
+      for (let i = 0; i < 3; i++) plankton.push({ x: x0 + 150 * s + i * 22 * s, y: yy + i * 10 * s, p: rnd() * 6, gold: false });
+    }
+    if (!mp && !whales.length && score > 4 && Math.random() < .03) whales.push({ x: W + 260 * s, y: H * (.2 + Math.random() * .35), seen: false });
+  }
+
+  function hitRect(cx, cy, r, x, y, w, h) {
+    const nx = Math.max(x, Math.min(cx, x + w)), ny = Math.max(y, Math.min(cy, y + h));
+    return (cx - nx) ** 2 + (cy - ny) ** 2 < r * r;
+  }
+
+  let hudT = 0;
+  function update(dt) {
+    t += dt;
+    const s = S(), m = M();
+    jelly.phase += dt * 0.12;
+    jelly.squish *= Math.pow(0.9, dt);
+    jelly.flash *= Math.pow(0.9, dt);
+    for (const q of pops) { q.x += q.vx * dt; q.y += q.vy * dt; q.life -= (q.decay || .03) * dt; }
+    pops = pops.filter(q => q.life > 0);
+    for (const x of texts) { x.y -= 0.7 * s * dt; x.life -= 0.018 * dt; }
+    texts = texts.filter(x => x.life > 0);
+
+    if (state === 'menu') {
+      jelly.x = W * 0.5; jelly.y = Math.min(H * 0.17, 115 * s) + Math.sin(t * 0.04) * 8 * s; jelly.r = 26 * s * Math.min(rMul(), 1.2);
+      if (Math.random() < .02) jelly.squish = .6;
+      return;
+    }
+    if (mp && mpRun && state === 'play') return updateMp(dt);
+    jelly.vy = Math.min(jelly.vy + 0.36 * s * gMul() * dt, 9 * s * (save.codes.MOON ? .7 : 1));
+    jelly.y += jelly.vy * dt;
+    if (jelly.y < jelly.r) { jelly.y = jelly.r; jelly.vy = 0; }
+    const floor = H - 40 * s;
+    if (state === 'over') { if (jelly.y > floor - jelly.r * .6) { jelly.y = floor - jelly.r * .6; jelly.vy = 0; } return; }
+
+    if (jelly.inv > 0) jelly.inv -= dt;
+    if (active.magnet > 0) active.magnet -= dt;
+    if (active.slow > 0) active.slow -= dt;
+    if (comboT > 0) { comboT -= dt; if (comboT <= 0) combo = 0; }
+    if (m.timer) { timeLeft -= dt / 60; if (timeLeft <= 0) { timeLeft = 0; updateHud(); return end(true); } }
+
+    const base = (2.6 + Math.min(score / m.pts * 0.045, 2.4)) * s * m.speed;
+    speed = base * (active.slow > 0 ? 0.55 : 1);
+    spawnT -= dt * (speed / (2.6 * s));
+    if (spawnT <= 0) { spawnGate(); spawnT = 95; }
+
+    stepObjects(dt, s, floor, m);
+
+    if (jelly.y + jelly.r * .6 > floor) {
+      jelly.y = floor - jelly.r * .6;
+      if (m.lethal && !active.shield && !active.revive) end(false);
+      else { jelly.vy = -6 * s; hurt(); }
+    }
+    hudT -= dt; if (hudT <= 0) { updateHud(); hudT = 6; }
+  }
+
+  function stepObjects(dt, s, floor, m) {
+    // trail
+    trailT -= dt;
+    if (save.trail !== 'none' && trailT <= 0) {
+      trailT = save.trail === 'rainbow' ? 1.5 : 4;
+      const tx = jelly.x - jelly.r * .2, ty = jelly.y + jelly.r * .4;
+      const q = { x: tx + (Math.random() - .5) * jelly.r, y: ty + (Math.random() - .5) * jelly.r * .6, vx: -speed * .9, vy: (Math.random() - .5) * .6 * s, life: 1, decay: .022, r: 3 };
+      if (save.trail === 'bubbles') Object.assign(q, { shape: 'bubble', c: '200,235,255', r: 2 + Math.random() * 3, vy: -.6 * s });
+      if (save.trail === 'sparkles') Object.assign(q, { shape: 'spark', c: ['255,240,150', '255,255,255', '143,243,255'][Math.floor(Math.random() * 3)] });
+      if (save.trail === 'hearts') Object.assign(q, { shape: 'heart', c: '255,110,170', r: 5 });
+      if (save.trail === 'rainbow') Object.assign(q, { shape: 'rain', h: (t * 6) % 360, r: 5, y: ty, vy: 0, decay: .03 });
+      if (save.trail === 'stars') Object.assign(q, { shape: 'star', c: '255,226,122', r: 5 });
+      if (save.trail === 'snow') Object.assign(q, { shape: 'flake', c: '255,255,255', r: 3.5, vy: .5 * s });
+      if (save.trail === 'fire') Object.assign(q, { c: ['255,230,110', '255,160,50', '255,80,60'][Math.floor(Math.random() * 3)], r: 3 + Math.random() * 2.5, vy: -.8 * s, decay: .035 });
+      if (save.trail === 'notes') Object.assign(q, { shape: 'note', h: Math.random() * 360, r: 10, vy: -.4 * s, decay: .018 });
+      if (save.trail === 'coins') Object.assign(q, { shape: 'coin', r: 4.5 });
+      if (save.trail === 'galaxy') Object.assign(q, { shape: 'star', c: ['167,139,255', '255,143,216', '143,243,255'][Math.floor(Math.random() * 3)], r: 4.5 });
+      if (save.trail === 'fire' || save.trail === 'snow') trailT = 2.5;
+      pops.push(q);
+    }
+
+    const r = jelly.r * 0.78;
+    for (const g of gates) {
+      g.x -= speed * dt;
+      if (g.moving) { const d = Math.sin(t * 0.03 + g.bob) * 0.6 * s * dt; g.top += d; g.bottom += d; }
+      if (!g.passed && g.x + g.w < jelly.x) { g.passed = true; score += Math.round(m.pts); sfx.pass(); }
+      const cx = g.x + g.w / 2;
+      if (hitRect(jelly.x, jelly.y, r, cx - 5 * s, 0, 10 * s, g.top)) hurt();
+      else if (hitRect(jelly.x, jelly.y, r, g.x, g.bottom, g.w, floor - g.bottom)) hurt();
+    }
+    gates = gates.filter(g => g.x > -g.w * 2);
+
+    if (!mp) for (const w of whales) {
+      w.x -= speed * .35 * dt;
+      if (!w.seen && w.x < W * .85) { w.seen = true; sfx.whale(); addText(W * .6, w.y - 60 * s, 'a wild whale!', '#8ff3ff'); unlock('whale'); }
+    }
+    whales = whales.filter(w => w.x > -400 * s);
+
+    for (const p of plankton) {
+      p.x -= speed * dt;
+      if (active.magnet > 0) {
+        const dx = jelly.x - p.x, dy = jelly.y - p.y, d = Math.hypot(dx, dy);
+        if (d < 220 * s && d > 0) { p.x += dx / d * 6 * s * dt; p.y += dy / d * 6 * s * dt; }
+      }
+      if ((p.x - jelly.x) ** 2 + (p.y - jelly.y) ** 2 < (jelly.r + 12 * s) ** 2) {
+        p.got = true; combo++; topCombo = Math.max(topCombo, combo); comboT = 150;
+        runPearls += p.gold ? 5 : 1;
+        if (p.gold) { save.gold++; if (save.gold >= 10) unlock('gold10'); }
+        if (combo >= 5) unlock('combo5');
+        if (combo >= 10) unlock('combo10');
+        const add = Math.round((p.gold ? 10 : 2) * mult_() * m.pts);
+        score += add; sfx.collect(combo);
+        addText(p.x, p.y - 14 * s, '+' + add + (p.gold ? ' golden!' : ''), p.gold ? '#ffd23f' : '#ffe27a');
+        burst(p.x, p.y, p.gold ? '255,210,63' : '255,240,150', p.gold ? 16 : 8);
+      }
+    }
+    plankton = plankton.filter(p => p.x > -20 && !p.got);
+
+    for (const u of powerups) {
+      u.x -= speed * dt;
+      if ((u.x - jelly.x) ** 2 + (u.y - jelly.y) ** 2 < (jelly.r + 16 * s) ** 2) {
+        u.got = true; sfx.power();
+        if (u.k === 'shield') active.shield = true;
+        if (u.k === 'magnet') active.magnet = 420 * (1 + .35 * lv('magnet'));
+        if (u.k === 'slow') active.slow = 300 * (1 + .35 * lv('slow'));
+        if (u.k === 'revive') active.revive = true;
+        addText(u.x, u.y - 20 * s, POWERS[u.k].label + '!', POWERS[u.k].color);
+        burst(u.x, u.y, '255,255,255', 14);
+      }
+    }
+    powerups = powerups.filter(u => u.x > -30 && !u.got);
+  }
+
+  // ---------- drawing ----------
+  const hexRgb = h => { const n = parseInt(h.slice(1), 16); return `${n >> 16 & 255},${n >> 8 & 255},${n & 255}`; };
+  function skinColors(sk) {
+    let grad = null;
+    if (sk.rainbow) { const h = (t * 2) % 360; grad = [`hsl(${h},100%,85%)`, `hsl(${(h + 60) % 360},95%,68%)`, `hsl(${(h + 130) % 360},85%,55%)`]; }
+    else if (sk.aurora) { const k = Math.sin(t * .02); grad = [`hsl(${160 + k * 30},90%,75%)`, `hsl(${220 + k * 40},90%,65%)`, `hsl(${300 + k * 30},85%,60%)`]; }
+    else if (sk.custom) grad = save.custom;
+    else if (sk.grad) grad = sk.grad;
+    if (grad) {
+      const g = (sk.rainbow || sk.aurora) ? null : (sk.glow || hexRgb(grad[1]));
+      const glow = g ? (a => `rgba(${g},${a})`) : (a => grad[1].replace('hsl(', 'hsla(').replace(')', `,${a})`));
+      return { grad, light: grad[0], mid: grad[1], dark: grad[grad.length - 1], glow, t1: sk.t1 || glow(.85), t2: sk.t2 || 'rgba(255,255,255,.7)', alpha: 1 };
+    }
+    return { light: sk.light, mid: sk.mid, dark: sk.dark, glow: a => `rgba(${sk.glow},${a})`, t1: sk.t1, t2: sk.t2, alpha: sk.alpha || 1 };
+  }
+
+  function drawBg() {
+    const s = S(), m = M();
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    if (m.dark && state !== 'menu' && !mp) { g.addColorStop(0, '#0a1430'); g.addColorStop(1, '#02040e'); }
+    else { const oc = OC(); g.addColorStop(0, oc.bg[0]); g.addColorStop(.55, oc.bg[1]); g.addColorStop(1, oc.bg[2]); }
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const disco = save.codes.DISCO;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    if (disco) { ctx.fillStyle = `hsla(${(t * 3) % 360},90%,55%,.14)`; ctx.fillRect(0, 0, W, H); }
+    for (let i = 0; i < 4; i++) {
+      const x = ((i * 0.3 + 0.1) * W + Math.sin(t * (disco ? .03 : .004) + i) * (disco ? 120 : 40)) % (W + 200) - 100;
+      const rg = ctx.createLinearGradient(0, 0, 0, H * .8);
+      const col = disco ? `hsla(${(t * 4 + i * 90) % 360},100%,65%,` : 'rgba(' + OC().ray + ',';
+      rg.addColorStop(0, col + (disco ? '0.22)' : '0.10)')); rg.addColorStop(1, col + '0)');
+      ctx.fillStyle = rg;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 70 * s, 0); ctx.lineTo(x + 220 * s, H * .8); ctx.lineTo(x + 60 * s, H * .8); ctx.fill();
+    }
+    ctx.restore();
+    ctx.fillStyle = 'rgba(200,235,255,0.35)';
+    for (const b of bubbles) {
+      if (!reduce) { b.y -= b.s * 0.002; b.x -= (state === 'play' ? speed : .3) * 0.00015; if (b.y < -0.02) { b.y = 1.02; b.x = Math.random(); } if (b.x < -.02) b.x = 1.02; }
+      ctx.beginPath(); ctx.arc(b.x * W + Math.sin(t * .02 + b.y * 10) * 6, b.y * H, b.r * s * 1.4, 0, 7); ctx.fill();
+    }
+    for (const w of whales) drawWhale(w);
+    const floor = H - 40 * s;
+    ctx.fillStyle = OC().sand[0];
+    ctx.beginPath(); ctx.moveTo(0, H);
+    for (let x = 0; x <= W + 20; x += 20) ctx.lineTo(x, floor + Math.sin((x + t * 2) * 0.02) * 4 * s);
+    ctx.lineTo(W, H); ctx.fill();
+    ctx.fillStyle = OC().sand[1]; ctx.fillRect(0, floor + 10 * s, W, H);
+    // little shells and a starfish on the sand
+    ctx.fillStyle = '#ff9a7a';
+    for (let i = 0; i < 4; i++) {
+      const sx = ((i * 0.27 + 0.08) * W - (state === 'play' ? t * speed * .5 : 0)) % W; const x = sx < 0 ? sx + W : sx;
+      drawStarShape(ctx, x, floor + 22 * s, 7 * s, 3 * s, i % 2 ? '#ff9a7a' : '#ffd0e0', 0.3 * i);
+    }
+  }
+
+  function drawWhale(w) {
+    const s = S(), x = w.x, y = w.y + Math.sin(t * .02) * 10 * s;
+    ctx.save(); ctx.globalAlpha = .55;
+    ctx.fillStyle = '#1d4d9a';
+    ctx.beginPath(); ctx.ellipse(x, y, 170 * s, 58 * s, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + 150 * s, y); ctx.quadraticCurveTo(x + 220 * s, y - 10 * s, x + 260 * s, y - 50 * s + Math.sin(t * .05) * 10 * s);
+    ctx.lineTo(x + 240 * s, y + 5 * s); ctx.lineTo(x + 265 * s, y + 45 * s + Math.sin(t * .05) * 10 * s); ctx.quadraticCurveTo(x + 210 * s, y + 20 * s, x + 150 * s, y + 15 * s); ctx.fill();
+    ctx.fillStyle = '#2f6cc4'; ctx.beginPath(); ctx.ellipse(x - 20 * s, y + 25 * s, 130 * s, 26 * s, 0, 0, Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x + 10 * s, y + 40 * s, 40 * s, 12 * s, .5, 0, 7); ctx.fill();
+    ctx.globalAlpha = .9; ctx.fillStyle = '#eaf4ff'; ctx.beginPath(); ctx.arc(x - 110 * s, y - 8 * s, 6 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#0b1d4a'; ctx.beginPath(); ctx.arc(x - 111 * s, y - 8 * s, 3.5 * s, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawGate(g) {
+    const s = S(), floor = H - 40 * s, cx = g.x + g.w / 2;
+    const kp = OC().kelp;
+    ctx.fillStyle = kp[0]; ctx.strokeStyle = kp[1]; ctx.lineWidth = 3 * s;
+    ctx.beginPath();
+    const steps = 10;
+    for (let i = 0; i <= steps; i++) { const y = g.bottom + (floor - g.bottom) * (i / steps); ctx.lineTo(g.x + Math.sin(t * 0.05 + g.sway + i * .7) * 5 * s, y); }
+    for (let i = steps; i >= 0; i--) { const y = g.bottom + (floor - g.bottom) * (i / steps); ctx.lineTo(g.x + g.w + Math.sin(t * 0.05 + g.sway + i * .7) * 5 * s, y); }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = kp[2];
+    for (let y = g.bottom + 16 * s; y < floor; y += 34 * s) {
+      const off = Math.sin(t * 0.05 + g.sway + y * .03) * 5 * s;
+      ctx.beginPath(); ctx.ellipse(g.x + off - 6 * s, y, 12 * s, 5 * s, -0.5, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(g.x + g.w + off + 6 * s, y + 14 * s, 12 * s, 5 * s, 0.5, 0, 7); ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(cx, g.bottom + 4 * s, g.w / 2 + 2 * s, Math.PI, 0); ctx.fillStyle = kp[0]; ctx.fill();
+    ctx.strokeStyle = 'rgba(230,240,255,0.85)'; ctx.lineWidth = 2 * s;
+    ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, g.top - 14 * s); ctx.stroke();
+    ctx.strokeStyle = '#d7dde8'; ctx.lineWidth = 4 * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(cx, g.top - 16 * s); ctx.lineTo(cx, g.top - 4 * s);
+    ctx.arc(cx - 9 * s, g.top - 4 * s, 9 * s, 0, Math.PI * 0.9); ctx.stroke();
+    ctx.fillStyle = g.moving ? '#ffb347' : '#ff5a5f';
+    ctx.beginPath(); ctx.arc(cx, g.top - 30 * s, 7 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, g.top - 30 * s, 7 * s, Math.PI, 0); ctx.fill();
+  }
+
+  function drawStarShape(c, x, y, R, r, fill, rot = 0) {
+    c.fillStyle = fill; c.beginPath();
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5 + rot, rr = i % 2 ? r : R; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+    c.closePath(); c.fill();
+  }
+  function drawHeart(c, x, y, r, fill) {
+    c.fillStyle = fill; c.beginPath();
+    c.moveTo(x, y + r * .9);
+    c.bezierCurveTo(x - r * 1.6, y - r * .2, x - r * .6, y - r * 1.3, x, y - r * .4);
+    c.bezierCurveTo(x + r * .6, y - r * 1.3, x + r * 1.6, y - r * .2, x, y + r * .9);
+    c.fill();
+  }
+
+  function drawPlankton(p) {
+    const s = S();
+    const pr = (p.gold ? 9 : 6) * s + Math.sin(t * .1 + p.p) * 2 * s;
+    const col = p.gold ? '255,210,63' : '255,230,120';
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, pr * 3);
+    g.addColorStop(0, p.gold ? 'rgba(255,255,220,1)' : 'rgba(255,248,170,1)');
+    g.addColorStop(.3, `rgba(${col},.6)`); g.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, pr * 3, 0, 7); ctx.fill();
+    if (p.gold) drawStarShape(ctx, p.x, p.y, pr * .9, pr * .4, '#fff', t * .03);
+  }
+
+  function drawPower(u) {
+    const s = S(), c = POWERS[u.k].color, y = u.y + Math.sin(t * .08 + u.p) * 5 * s, R = 15 * s;
+    const g = ctx.createRadialGradient(u.x, y, 0, u.x, y, R * 2.4);
+    g.addColorStop(0, c + 'aa'); g.addColorStop(1, c + '00');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(u.x, y, R * 2.4, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.strokeStyle = c; ctx.lineWidth = 3 * s;
+    ctx.beginPath(); ctx.arc(u.x, y, R, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3 * s; ctx.lineCap = 'round';
+    if (u.k === 'shield') { ctx.beginPath(); ctx.moveTo(u.x, y - 8 * s); ctx.lineTo(u.x + 7 * s, y - 4 * s); ctx.lineTo(u.x + 5 * s, y + 5 * s); ctx.lineTo(u.x, y + 8 * s); ctx.lineTo(u.x - 5 * s, y + 5 * s); ctx.lineTo(u.x - 7 * s, y - 4 * s); ctx.closePath(); ctx.stroke(); }
+    if (u.k === 'magnet') { ctx.beginPath(); ctx.arc(u.x, y, 6 * s, Math.PI, 0, true); ctx.moveTo(u.x - 6 * s, y); ctx.lineTo(u.x - 6 * s, y - 7 * s); ctx.moveTo(u.x + 6 * s, y); ctx.lineTo(u.x + 6 * s, y - 7 * s); ctx.stroke(); }
+    if (u.k === 'revive') drawHeart(ctx, u.x, y, 7 * s, '#fff');
+    if (u.k === 'slow') { ctx.beginPath(); ctx.arc(u.x, y, 7 * s, 0, 7); ctx.moveTo(u.x, y); ctx.lineTo(u.x, y - 5 * s); ctx.moveTo(u.x, y); ctx.lineTo(u.x + 4 * s, y + 2 * s); ctx.stroke(); }
+  }
+
+  function drawHat(c, r, s, hat) {
+    c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
+    if (hat === 'bow') {
+      c.translate(r * .5, -r * .78); c.rotate(.3);
+      c.fillStyle = '#ff4f9a';
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(-r * .38, -r * .22); c.lineTo(-r * .38, r * .22); c.closePath(); c.fill();
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(r * .38, -r * .22); c.lineTo(r * .38, r * .22); c.closePath(); c.fill();
+      c.fillStyle = '#ff8fc4'; c.beginPath(); c.arc(0, 0, r * .1, 0, 7); c.fill();
+    } else if (hat === 'party') {
+      c.fillStyle = '#5ad1ff';
+      c.beginPath(); c.moveTo(-r * .34, -r * .82); c.lineTo(r * .34, -r * .82); c.lineTo(r * .06, -r * 1.8); c.closePath(); c.fill();
+      c.strokeStyle = '#ffe27a'; c.lineWidth = 3 * s;
+      c.beginPath(); c.moveTo(-r * .22, -r * 1.08); c.lineTo(r * .27, -r * 1.08); c.moveTo(-r * .1, -r * 1.38); c.lineTo(r * .19, -r * 1.38); c.stroke();
+      c.fillStyle = '#ff8fd8'; c.beginPath(); c.arc(r * .06, -r * 1.82, r * .13, 0, 7); c.fill();
+    } else if (hat === 'shades') {
+      c.fillStyle = '#14142a';
+      for (const ex of [-r * .3, r * .3]) { c.beginPath(); c.ellipse(ex, -r * .3, r * .21, r * .14, 0, 0, 7); c.fill(); }
+      c.strokeStyle = '#14142a'; c.lineWidth = 3 * s; c.beginPath(); c.moveTo(-r * .1, -r * .34); c.lineTo(r * .1, -r * .34); c.stroke();
+      c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 2 * s;
+      for (const ex of [-r * .3, r * .3]) { c.beginPath(); c.moveTo(ex - r * .1, -r * .35); c.lineTo(ex - r * .02, -r * .4); c.stroke(); }
+    } else if (hat === 'propeller') {
+      c.fillStyle = '#ff5a5f'; c.beginPath(); c.arc(0, -r * .8, r * .4, Math.PI, Math.PI * 1.5); c.lineTo(0, -r * .8); c.fill();
+      c.fillStyle = '#ffe27a'; c.beginPath(); c.arc(0, -r * .8, r * .4, Math.PI * 1.5, 0); c.lineTo(0, -r * .8); c.fill();
+      c.fillStyle = '#5ad1ff'; c.beginPath(); c.arc(0, -r * .8, r * .4, Math.PI * 1.25, Math.PI * 1.75); c.lineTo(0, -r * .8); c.fill();
+      c.strokeStyle = '#555'; c.lineWidth = 2.5 * s; c.beginPath(); c.moveTo(0, -r * 1.2); c.lineTo(0, -r * 1.42); c.stroke();
+      const spin = Math.abs(Math.sin(t * .5));
+      c.fillStyle = '#8ff3ff'; c.beginPath(); c.ellipse(0, -r * 1.44, r * .55 * spin + 2, r * .07, 0, 0, 7); c.fill();
+    } else if (hat === 'crown') {
+      c.fillStyle = '#ffcf3f'; c.strokeStyle = '#c8961e'; c.lineWidth = 2 * s;
+      c.beginPath(); c.moveTo(-r * .42, -r * .78); c.lineTo(-r * .46, -r * 1.25); c.lineTo(-r * .22, -r * 1.02); c.lineTo(0, -r * 1.34); c.lineTo(r * .22, -r * 1.02); c.lineTo(r * .46, -r * 1.25); c.lineTo(r * .42, -r * .78); c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = '#ff4f9a'; c.beginPath(); c.arc(0, -r * .92, r * .08, 0, 7); c.fill();
+      c.fillStyle = '#5ad1ff'; c.beginPath(); c.arc(-r * .25, -r * .88, r * .06, 0, 7); c.arc(r * .25, -r * .88, r * .06, 0, 7); c.fill();
+    } else if (hat === 'flower') {
+      c.translate(r * .48, -r * .74);
+      c.fillStyle = '#ff8fc4';
+      for (let i = 0; i < 5; i++) { const an = i * Math.PI * 2 / 5; c.beginPath(); c.arc(Math.cos(an) * r * .14, Math.sin(an) * r * .14, r * .11, 0, 7); c.fill(); }
+      c.fillStyle = '#ffe27a'; c.beginPath(); c.arc(0, 0, r * .09, 0, 7); c.fill();
+    } else if (hat === 'catears') {
+      for (const sx of [-1, 1]) {
+        c.fillStyle = '#ffb3d1'; c.beginPath(); c.moveTo(sx * r * .2, -r * .9); c.lineTo(sx * r * .55, -r * 1.35); c.lineTo(sx * r * .7, -r * .7); c.closePath(); c.fill();
+        c.fillStyle = '#ff6fa8'; c.beginPath(); c.moveTo(sx * r * .32, -r * .88); c.lineTo(sx * r * .55, -r * 1.18); c.lineTo(sx * r * .62, -r * .78); c.closePath(); c.fill();
+      }
+    } else if (hat === 'horns') {
+      c.fillStyle = '#ff3d3d';
+      for (const sx of [-1, 1]) { c.beginPath(); c.moveTo(sx * r * .2, -r * .9); c.quadraticCurveTo(sx * r * .3, -r * 1.3, sx * r * .58, -r * 1.38); c.quadraticCurveTo(sx * r * .45, -r * 1.05, sx * r * .52, -r * .8); c.closePath(); c.fill(); }
+    } else if (hat === 'headphones') {
+      c.strokeStyle = '#7a5cff'; c.lineWidth = 5 * s;
+      c.beginPath(); c.arc(0, -r * .3, r * .95, Math.PI * 1.08, Math.PI * 1.92); c.stroke();
+      c.fillStyle = '#5b3bd6';
+      for (const sx of [-1, 1]) { c.beginPath(); c.ellipse(sx * r * .92, -r * .32, r * .17, r * .26, 0, 0, 7); c.fill(); }
+      c.fillStyle = '#ff8fd8'; for (const sx of [-1, 1]) { c.beginPath(); c.arc(sx * r * .92, -r * .32, r * .07, 0, 7); c.fill(); }
+    } else if (hat === 'chef') {
+      c.fillStyle = '#ffffff'; c.strokeStyle = '#d6dbe8'; c.lineWidth = 1.5 * s;
+      c.beginPath(); c.rect(-r * .36, -r * 1.12, r * .72, r * .34); c.fill(); c.stroke();
+      for (const [px, py, pr] of [[-r * .26, -r * 1.25, r * .22], [r * .26, -r * 1.25, r * .22], [0, -r * 1.42, r * .27]]) { c.beginPath(); c.arc(px, py, pr, 0, 7); c.fill(); }
+    } else if (hat === 'cowboy') {
+      c.fillStyle = '#a8653a';
+      c.beginPath(); c.ellipse(0, -r * .82, r * .9, r * .16, 0, 0, 7); c.fill();
+      c.beginPath(); c.moveTo(-r * .36, -r * .84); c.quadraticCurveTo(-r * .4, -r * 1.42, -r * .1, -r * 1.3); c.quadraticCurveTo(0, -r * 1.2, r * .1, -r * 1.3); c.quadraticCurveTo(r * .4, -r * 1.42, r * .36, -r * .84); c.closePath(); c.fill();
+      c.fillStyle = '#5a3218'; c.fillRect(-r * .37, -r * .98, r * .74, r * .1);
+    } else if (hat === 'tophat') {
+      c.fillStyle = '#222233';
+      c.beginPath(); c.ellipse(0, -r * .82, r * .62, r * .12, 0, 0, 7); c.fill();
+      c.fillRect(-r * .36, -r * 1.65, r * .72, r * .84);
+      c.fillStyle = '#ff4f6a'; c.fillRect(-r * .36, -r * 1.02, r * .72, r * .13);
+      c.fillStyle = 'rgba(255,255,255,.15)'; c.fillRect(-r * .28, -r * 1.6, r * .08, r * .55);
+    } else if (hat === 'halo') {
+      const hy = -r * 1.28 + Math.sin(t * .06) * r * .05;
+      c.strokeStyle = 'rgba(255,226,122,.35)'; c.lineWidth = 9 * s; c.beginPath(); c.ellipse(0, hy, r * .5, r * .13, 0, 0, 7); c.stroke();
+      c.strokeStyle = '#ffe27a'; c.lineWidth = 4 * s; c.beginPath(); c.ellipse(0, hy, r * .5, r * .13, 0, 0, 7); c.stroke();
+    } else if (hat === 'viking') {
+      c.fillStyle = '#f4ead2';
+      for (const sx of [-1, 1]) { c.beginPath(); c.moveTo(sx * r * .4, -r * .95); c.quadraticCurveTo(sx * r * .95, -r * 1.0, sx * r * .85, -r * 1.55); c.quadraticCurveTo(sx * r * .75, -r * 1.15, sx * r * .35, -r * 1.15); c.closePath(); c.fill(); }
+      c.fillStyle = '#9aa4b8'; c.beginPath(); c.arc(0, -r * .82, r * .48, Math.PI, 0); c.closePath(); c.fill();
+      c.fillStyle = '#c8a24a'; c.fillRect(-r * .5, -r * .88, r * 1, r * .1);
+      c.fillStyle = '#c8a24a'; c.fillRect(-r * .04, -r * 1.3, r * .08, r * .45);
+    } else if (hat === 'wizard') {
+      c.fillStyle = '#5b3bd6';
+      c.beginPath(); c.moveTo(-r * .42, -r * .8); c.lineTo(r * .42, -r * .8); c.quadraticCurveTo(r * .2, -r * 1.4, r * .5, -r * 2.0); c.quadraticCurveTo(-r * .05, -r * 1.5, -r * .42, -r * .8); c.fill();
+      c.fillStyle = '#7a5cff'; c.beginPath(); c.ellipse(0, -r * .8, r * .62, r * .12, 0, 0, 7); c.fill();
+      drawStarShape(c, r * .02, -r * 1.2, r * .12, r * .05, '#ffe27a', t * .02);
+      drawStarShape(c, r * .22, -r * 1.55, r * .08, r * .035, '#ffe27a', -t * .03);
+    }
+    c.restore();
+  }
+
+  // Draw any jelly on any canvas context.
+  function drawJellyAt(c, x, y, r, o) {
+    const s = r / 22, sk = skinColors(SKINS[o.skin]);
+    const sq = o.sq || 0, sx = 1 + sq * 0.25, sy = 1 - sq * 0.3;
+    c.save();
+    c.globalAlpha = (o.alpha == null ? 1 : o.alpha) * sk.alpha;
+    const glow = c.createRadialGradient(x, y, r * .2, x, y, r * 2.6);
+    glow.addColorStop(0, sk.glow(0.45)); glow.addColorStop(1, sk.glow(0));
+    c.fillStyle = glow; c.beginPath(); c.arc(x, y, r * 2.6, 0, 7); c.fill();
+    c.lineCap = 'round';
+    for (let i = 0; i < 5; i++) {
+      const tx = x + (i - 2) * r * 0.38 * sx;
+      c.strokeStyle = i % 2 ? sk.t2 : sk.t1; c.lineWidth = (i % 2 ? 2.5 : 3.5) * s;
+      c.beginPath(); c.moveTo(tx, y + r * 0.1);
+      const len = r * (1.5 + (i % 2) * .5) * (1 + sq * .3);
+      for (let k = 1; k <= 8; k++) c.lineTo(tx + Math.sin(o.phase * 3 + k * .8 + i) * (k * 1.1) * s, y + r * 0.1 + len * k / 8);
+      c.stroke();
+    }
+    c.translate(x, y); c.scale(sx, sy);
+    const bellPath = () => { c.beginPath(); c.ellipse(0, 0, r, r * .95, 0, Math.PI, 0); for (let i = 6; i >= 0; i--) { const px = -r + 2 * r * (i / 6); c.quadraticCurveTo(px + r / 6, r * .28, px, r * 0.12); } c.closePath(); };
+    if (sk.grad && !(o.flash > .1)) {
+      const lg = c.createLinearGradient(0, -r, 0, r * .3);
+      sk.grad.forEach((col, i) => lg.addColorStop(i / (sk.grad.length - 1), col));
+      c.fillStyle = lg; bellPath(); c.fill();
+      const hl = c.createRadialGradient(-r * .3, -r * .5, r * .05, -r * .2, -r * .3, r * .9);
+      hl.addColorStop(0, 'rgba(255,255,255,.5)'); hl.addColorStop(1, 'rgba(255,255,255,0)');
+      c.fillStyle = hl; bellPath(); c.fill();
+    } else {
+      const bell = c.createRadialGradient(-r * .3, -r * .5, r * .1, 0, 0, r * 1.2);
+      bell.addColorStop(0, sk.light); bell.addColorStop(.5, o.flash > .1 ? '#ff6b7a' : sk.mid); bell.addColorStop(1, sk.dark);
+      c.fillStyle = bell; bellPath(); c.fill();
+    }
+    c.fillStyle = 'rgba(255,255,255,0.55)';
+    c.beginPath(); c.ellipse(-r * .4, -r * .5, r * .22, r * .12, -0.5, 0, 7); c.fill();
+    const face = o.face || 'happy', st = o.style || 'normal', ink = '#3a1240';
+    c.lineWidth = 2.2 * s; c.strokeStyle = ink;
+    const E = [-r * .3, r * .3], ey = -r * .3;
+    const dot = (ex, rr = 3.2) => { c.fillStyle = ink; c.beginPath(); c.arc(ex, ey, rr * s, 0, 7); c.fill(); c.fillStyle = '#fff'; c.beginPath(); c.arc(ex + s, ey - s, 1.1 * s, 0, 7); c.fill(); };
+    const caret = ex => { c.beginPath(); c.arc(ex, ey + 2.5 * s, 4 * s, Math.PI * 1.15, Math.PI * 1.85); c.stroke(); };
+    if (face === 'dead') {
+      for (const ex of E) { c.beginPath(); c.moveTo(ex - 4 * s, ey - 4 * s); c.lineTo(ex + 4 * s, ey + 4 * s); c.moveTo(ex + 4 * s, ey - 4 * s); c.lineTo(ex - 4 * s, ey + 4 * s); c.stroke(); }
+    } else if (st === 'kawaii') E.forEach(caret);
+    else if (st === 'sleepy') E.forEach(ex => { c.beginPath(); c.moveTo(ex - 4 * s, ey); c.lineTo(ex + 4 * s, ey); c.stroke(); });
+    else if (st === 'wink') { dot(E[0]); caret(E[1]); }
+    else if (st === 'angry') { E.forEach(ex => dot(ex)); c.beginPath(); c.moveTo(E[0] - 5 * s, ey - 7 * s); c.lineTo(E[0] + 4 * s, ey - 4 * s); c.moveTo(E[1] + 5 * s, ey - 7 * s); c.lineTo(E[1] - 4 * s, ey - 4 * s); c.stroke(); }
+    else if (st === 'stars') E.forEach(ex => drawStarShape(c, ex, ey, 5.5 * s, 2.4 * s, '#ffd23f', 0));
+    else if (st === 'hearts') E.forEach(ex => drawHeart(c, ex, ey, 4.5 * s, '#ff3d7f'));
+    else if (st === 'derp') { dot(E[0], 4.4); dot(E[1], 2.2); }
+    else E.forEach(ex => dot(ex));
+    c.fillStyle = ink; c.strokeStyle = ink;
+    c.beginPath();
+    if (face === 'dead') { c.arc(0, -r * .02, 4 * s, Math.PI * 1.15, Math.PI * 1.85); c.stroke(); }
+    else if (face === 'grin' || st === 'hearts' || st === 'stars') { c.arc(0, -r * .2, 5 * s, 0, Math.PI); c.fill(); }
+    else if (st === 'sleepy') { c.arc(0, -r * .12, 2.2 * s, 0, 7); c.stroke(); }
+    else if (st === 'angry') { c.arc(0, -r * .02, 4 * s, Math.PI * 1.2, Math.PI * 1.8); c.stroke(); }
+    else if (st === 'derp') { c.arc(0, -r * .18, 4.5 * s, 0.1 * Math.PI, 0.9 * Math.PI); c.stroke(); c.fillStyle = '#ff6b9a'; c.beginPath(); c.ellipse(2 * s, -r * .18 + 5 * s, 2.5 * s, 3.5 * s, 0, 0, 7); c.fill(); }
+    else { c.arc(0, -r * .18, 4.5 * s, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke(); }
+    c.fillStyle = 'rgba(255,90,150,0.45)';
+    c.beginPath(); c.ellipse(-r * .52, -r * .14, 4.5 * s, 2.6 * s, 0, 0, 7); c.ellipse(r * .52, -r * .14, 4.5 * s, 2.6 * s, 0, 0, 7); c.fill();
+    if (o.hat && o.hat !== 'none') drawHat(c, r, s, o.hat);
+    c.restore();
+  }
+
+  function drawJelly() {
+    const { x, y, r } = jelly, s = S();
+    const blink = jelly.inv > 0 && Math.floor(jelly.inv / 5) % 2 === 0;
+    const face = state === 'over' && M().lethal && !overTimeUp ? 'dead' : combo >= 3 ? 'grin' : 'happy';
+    drawJellyAt(ctx, x, y, r, { sq: jelly.squish, phase: jelly.phase, face, style: save.face, skin: skinKey, hat: save.hat, alpha: blink ? .45 : 1, flash: jelly.flash });
+    if (save.name) {
+      ctx.save(); ctx.textAlign = 'center'; ctx.font = `800 ${Math.round(11 * s + 5)}px Nunito, system-ui, sans-serif`;
+      ctx.fillStyle = 'rgba(238,246,255,.85)';
+      const hatLift = { party: 1.0, wizard: 1.25, propeller: .6, crown: .55, tophat: .85, chef: .6, cowboy: .55, halo: .5, viking: .5, horns: .35, catears: .35 }[save.hat] || 0;
+      ctx.fillText(save.name, x, y - r * (1.25 + hatLift) - 4 * s);
+      ctx.restore();
+    }
+    if (active.shield && state === 'play') {
+      ctx.save();
+      ctx.strokeStyle = `rgba(143,243,255,${.6 + Math.sin(t * .15) * .2})`; ctx.lineWidth = 3 * s; ctx.fillStyle = 'rgba(143,243,255,.1)';
+      ctx.beginPath(); ctx.arc(x, y + r * .3, r * 1.7, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.ellipse(x - r * .8, y - r * .6, r * .3, r * .15, -0.7, 0, 7); ctx.fill();
+      ctx.restore();
+    }
+    if (active.magnet > 0 && state === 'play') {
+      ctx.strokeStyle = `rgba(255,122,138,${.25 + Math.sin(t * .2) * .1})`; ctx.lineWidth = 2 * s;
+      ctx.setLineDash([6 * s, 8 * s]); ctx.beginPath(); ctx.arc(x, y, (60 + (t * 2 % 40)) * s, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+
+  function drawPops() {
+    const s = S();
+    for (const q of pops) {
+      const a = Math.max(0, q.life);
+      if (q.shape === 'bubble') { ctx.strokeStyle = `rgba(${q.c},${a})`; ctx.lineWidth = 1.5 * s; ctx.beginPath(); ctx.arc(q.x, q.y, q.r * s, 0, 7); ctx.stroke(); }
+      else if (q.shape === 'heart') drawHeart(ctx, q.x, q.y, q.r * s * (0.6 + a * .4), `rgba(${q.c},${a})`);
+      else if (q.shape === 'star' || q.shape === 'spark') drawStarShape(ctx, q.x, q.y, q.r * s * (q.shape === 'spark' ? .9 : 1.1), q.r * s * .4, `rgba(${q.c},${a})`, t * .05);
+      else if (q.shape === 'flake') { ctx.strokeStyle = `rgba(${q.c},${a})`; ctx.lineWidth = 1.5 * s; ctx.beginPath(); for (let i = 0; i < 3; i++) { const an = i * Math.PI / 3 + t * .02; ctx.moveTo(q.x - Math.cos(an) * q.r * s, q.y - Math.sin(an) * q.r * s); ctx.lineTo(q.x + Math.cos(an) * q.r * s, q.y + Math.sin(an) * q.r * s); } ctx.stroke(); }
+      else if (q.shape === 'note') { ctx.fillStyle = `hsla(${q.h},90%,72%,${a})`; ctx.font = `800 ${Math.round(q.r * s * 1.6)}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.fillText(q.h > 180 ? '♫' : '♪', q.x, q.y); }
+      else if (q.shape === 'coin') { ctx.fillStyle = `rgba(255,210,63,${a})`; ctx.strokeStyle = `rgba(200,150,30,${a})`; ctx.lineWidth = 1.5 * s; ctx.beginPath(); ctx.ellipse(q.x, q.y, q.r * s * Math.abs(Math.sin(t * .1 + q.y)) + .5, q.r * s, 0, 0, 7); ctx.fill(); ctx.stroke(); }
+      else if (q.shape === 'rain') { ctx.fillStyle = `hsla(${q.h},95%,65%,${a * .8})`; ctx.beginPath(); ctx.arc(q.x, q.y, q.r * s * (0.5 + a * .5), 0, 7); ctx.fill(); }
+      else { ctx.fillStyle = `rgba(${q.c},${a})`; ctx.beginPath(); ctx.arc(q.x, q.y, q.r * s, 0, 7); ctx.fill(); }
+    }
+  }
+
+  function drawDark() {
+    const s = S(), R = (130 + Math.sin(t * .05) * 8) * s * Math.max(rMul(), .8);
+    const g = ctx.createRadialGradient(jelly.x, jelly.y, R * .35, jelly.x, jelly.y, R * 1.6);
+    g.addColorStop(0, 'rgba(1,2,10,0)'); g.addColorStop(.6, 'rgba(1,2,10,.85)'); g.addColorStop(1, 'rgba(1,2,10,.97)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+
+  function render() {
+    ctx.save();
+    if (shake > 0 && !reduce) { ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake); shake *= 0.85; if (shake < .5) shake = 0; }
+    drawBg();
+    gates.forEach(drawGate);
+    if (M().dark && state !== 'menu' && !mp) drawDark();
+    if (mp && mpRun && state === 'play') { drawFinish(); drawGhosts(); }
+    plankton.forEach(drawPlankton);
+    powerups.forEach(drawPower);
+    drawPops();
+    drawJelly();
+    ctx.textAlign = 'center';
+    for (const x of texts) {
+      ctx.globalAlpha = Math.max(0, x.life); ctx.fillStyle = x.color;
+      ctx.font = `800 ${Math.round(18 * S() + 6)}px Sniglet, Trebuchet MS, sans-serif`;
+      ctx.fillText(x.msg, x.x, x.y);
+    }
+    ctx.globalAlpha = 1;
+    if (active.slow > 0 && state === 'play') { ctx.fillStyle = 'rgba(255,226,122,.06)'; ctx.fillRect(0, 0, W, H); }
+    ctx.restore();
+
+    if (state === 'menu' && tab === 'closet') {
+      pctx.clearRect(0, 0, pv.width, pv.height);
+      drawJellyAt(pctx, 150, 120 + Math.sin(t * .05) * 6, 56, { phase: jelly.phase, skin: skinKey, hat: save.hat, style: save.face, sq: jelly.squish });
+      if (save.name) { pctx.textAlign = 'center'; pctx.font = '800 26px Nunito, system-ui, sans-serif'; pctx.fillStyle = '#eef6ff'; pctx.fillText(save.name, 150, 250); }
+    }
+  }
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min((now - last) / 16.67, 3); last = now;
+    update(dt); render();
+    requestAnimationFrame(loop);
+  }
+  reset(); state = 'menu'; renderAll();
+  requestAnimationFrame(loop);
+
+
+
+  // ---------- account save + save codes ----------
+  function setSaveStatus(t) { const el = document.getElementById('saveStatus'); if (el) el.textContent = t; }
+  function snapshotAll() { return { v: 1, save: JSON.parse(JSON.stringify(save)), bests: { ...bests }, skin: skinKey, at: store.get('savedAt', Date.now()) }; }
+  function queueCloud() {
+    if (!cloudDoc) return;
+    cloudDirty = true; clearTimeout(cloudT); cloudT = setTimeout(flushCloud, 2500);
+  }
+  function flushCloud() {
+    if (!cloudDoc || !cloudDirty) return;
+    if (cloudBusy) { clearTimeout(cloudT); cloudT = setTimeout(flushCloud, 1000); return; }
+    cloudBusy = true; cloudDirty = false;
+    let pr; try { pr = cloudDoc.set(snapshotAll()); } catch (e) { pr = Promise.reject(e); }
+    pr.then(() => setSaveStatus('Saved to your claude.ai account ✓'), () => setSaveStatus('Saved in this browser. Account save will retry.'))
+      .finally(() => { cloudBusy = false; if (cloudDirty) queueCloud(); });
+  }
+  function mergeIn(o, mode) {
+    const os = (o && typeof o.save === 'object' && o.save) || {};
+    const tables = { skin: SKINS, hat: HATS, trail: TRAILS, face: FACES, ocean: OCEANS };
+    const arr = a => Array.isArray(a) ? a.filter(x => typeof x === 'string') : [];
+    const uni = (a, b) => [...new Set([...arr(a), ...arr(b)])];
+    const num = v => Math.max(0, Math.min(1e9, Math.floor(+v || 0)));
+    const takeOther = mode === 'newer';
+    for (const k of Object.keys(tables)) save.owned[k] = uni(save.owned[k], os.owned && os.owned[k]).filter(x => tables[k][x]);
+    const ach = {}; for (const a of ACH) if (save.ach[a.id] || (os.ach && os.ach[a.id])) ach[a.id] = true; save.ach = ach;
+    for (const k of Object.keys(UPS)) save.up[k] = Math.min(UPS[k].prices.length, Math.max(lv(k), num(os.up && os.up[k])));
+    save.found = uni(save.found, os.found).filter(c => CODES[c]);
+    save.redeemed = uni(save.redeemed, os.redeemed);
+    save.gold = Math.max(num(save.gold), num(os.gold));
+    for (const k of Object.keys(MODES)) { if (os.played && os.played[k]) save.played[k] = true; bests[k] = Math.max(num(bests[k]), num(o.bests && o.bests[k])); }
+    if (mode === 'import') save.pearls = Math.max(num(save.pearls), num(os.pearls));
+    if (takeOther) save.pearls = num(os.pearls);
+    if (takeOther || mode === 'import') {
+      for (const k of ['hat', 'trail', 'face', 'ocean']) if (typeof os[k] === 'string' && tables[k][os[k]]) save[k] = os[k];
+      if (typeof os.name === 'string') save.name = os.name.slice(0, 12);
+      if (os.codes && typeof os.codes === 'object') { const c = {}; for (const k of Object.keys(CODES)) c[k] = !!os.codes[k]; save.codes = c; }
+      if (Array.isArray(os.custom) && os.custom.length === 3 && os.custom.every(x => /^#[0-9a-f]{6}$/i.test(x))) save.custom = os.custom.slice();
+      if (typeof o.skin === 'string' && SKINS[o.skin]) skinKey = o.skin;
+    }
+    if (!save.owned.skin.includes(skinKey) && !unlocked('skin', skinKey)) skinKey = 'bubblegum';
+    store.set('bests', bests); store.set('skin', skinKey);
+    $('nameInput').value = save.name; $('mpNick').value = save.name;
+    persist(); renderAll();
+  }
+  function encodeSave() { return 'JD1:' + btoa(unescape(encodeURIComponent(JSON.stringify(snapshotAll())))); }
+  function decodeSave(txt) {
+    const t = String(txt || '').replace(/\s+/g, '');
+    if (!t.startsWith('JD1:')) return null;
+    try { const o = JSON.parse(decodeURIComponent(escape(atob(t.slice(4))))); return o && typeof o === 'object' && o.save ? o : null; } catch (e) { return null; }
+  }
+  $('copySave').onclick = () => {
+    const code = encodeSave(), box = $('saveBox');
+    box.value = code; box.focus(); box.select();
+    try { navigator.clipboard.writeText(code).then(() => toast('Save code copied! Paste it into your other Jelly Drift'), () => toast('Save code is in the box, copy it from there')); }
+    catch (e) { toast('Save code is in the box, copy it from there'); }
+    sfx.tick();
+  };
+  $('loadSave').onclick = () => {
+    const o = decodeSave($('saveBox').value);
+    if (!o) { toast('That save code looks broken. Copy the whole thing and try again'); sfx.bonk(); return; }
+    mergeIn(o, 'import'); $('saveBox').value = '';
+    toast('Everything loaded! Your looks, name and unlocks are all here'); sfx.power();
+  };
+  (async () => {
+    if (!window.claude || typeof window.claude.use !== 'function') { setSaveStatus('Saved on this device. Copy a save code to move it to the claude.ai version.'); return; }
+    let db = null, user = null;
+    try { [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]); } catch (e) {}
+    let id = null;
+    if (db && user) { try { id = await user.id(); } catch (e) {} }
+    if (!id) { setSaveStatus('Saved in this browser. Sign in on claude.ai to save to your account.'); return; }
+    setSaveStatus('Syncing with your account…');
+    const ref = db.doc('data/users/' + id + '/progress');
+    let snap;
+    try { snap = await Promise.race([ref.get(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))]); }
+    catch (e) { setSaveStatus('Saved in this browser. Account sync is not available right now.'); return; }
+    cloudDoc = ref;
+    const cloud = snap && snap.exists ? snap.data() : null;
+    if (cloud && cloud.save) {
+      const newer = (+cloud.at || 0) > store.get('savedAt', 0);
+      mergeIn(cloud, newer ? 'newer' : 'older');
+      if (newer) toast('Loaded your progress from your account');
+    } else { cloudDirty = true; flushCloud(); }
+    setSaveStatus('Saved to your claude.ai account ✓');
+  })();
+
+  // ---------- multiplayer ----------
+  const MPMODES = {
+    race:     { name: 'Race', desc: 'First jelly to the finish line wins' },
+    survival: { name: 'Survival', desc: 'Crash once and you are out' },
+    rush:     { name: 'Plankton rush', desc: 'Most points in 45 seconds' },
+  };
+  const RACE_GATES = 20, SPACING = 250, FIRST = 420, RUSH_MS = 45000, CD_MS = 4000;
+  const FINISH = FIRST + RACE_GATES * SPACING - SPACING / 2;
+  function rnd() { return rngFn(); }
+  function mpOn() { return !!(mp && mpRun && state === 'play'); }
+  function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let q = Math.imul(a ^ a >>> 15, 1 | a); q = q + Math.imul(q ^ q >>> 7, 61 | q) ^ q; return ((q ^ q >>> 14) >>> 0) / 4294967296; }; }
+  const ord = n => n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
+  const cleanNick = v => String(v || '').replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁠-⁯]/g, '').slice(0, 12) || 'Jelly';
+  const myNick = () => cleanNick(save.name);
+  const nickOf = p => cleanNick(p && p.presence && p.presence.nick);
+  function colorOf(pr) {
+    const k = pr && SKINS[pr.skin] ? pr.skin : 'bubblegum', sk = SKINS[k];
+    if (sk.grad) return sk.grad[1]; if (sk.mid) return sk.mid;
+    return sk.rainbow ? '#ff8fd8' : sk.aurora ? '#6bc5ff' : (Array.isArray(pr.custom) && /^#[0-9a-f]{6}$/i.test(pr.custom[1]) ? pr.custom[1] : '#ff8fd8');
+  }
+  function mpPlayers() { const k = race && Array.isArray(race.kicked) ? race.kicked : []; return mp ? mp.r.peers().filter(p => p.kind === 'viewer' && (p.sameTab || !k.includes(p.peer))) : []; }
+  function meP() { return mpPlayers().find(p => p.sameTab); }
+  function showMp(view) {
+    $('mpLobby').hidden = view !== 'lobby';
+    $('mpResults').hidden = view !== 'results';
+    $('mpBar').hidden = view !== 'play';
+    $('mpExit').hidden = !mp;
+    if (view !== 'play') $('mpBanner').hidden = true;
+    if (view) { $('menu').hidden = true; $('over').hidden = true; }
+  }
+  function banner(txt) { const b = $('mpBanner'); if (b.textContent !== txt) b.textContent = txt; b.hidden = !txt; b.style.fontSize = /^[0-9]$|^GO!$/.test(txt) ? 'clamp(4rem, 22vw, 7rem)' : ''; }
+
+  // ---- peer-to-peer servers for the downloaded file (no claude.ai) ----
+  function loadScript(src) { return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); }); }
+  function p2pLobby() {
+    return { p2p: true, peers: () => [], onPeers: () => () => {}, presence: async () => {}, join: (name, create, onProgress) => p2pJoin(String(name).replace(/^jd-/, ''), create, onProgress) };
+  }
+  const PEER_OPTS = { debug: 0, config: { iceServers: [
+    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
+    { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turns:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
+  ], iceCandidatePoolSize: 4 } };
+  const CONNECT_TRIES = 4, TRY_MS = 12000, TOTAL_MS = 60000;
+  function p2pJoin(code, create, onProgress) {
+    const say = m => { try { onProgress && onProgress(m); } catch (e) {} };
+    return new Promise((resolve, reject) => {
+      const hostId = 'jellydrift-' + code;
+      let peer;
+      try { peer = create ? new Peer(hostId, PEER_OPTS) : new Peer(PEER_OPTS); } catch (e) { reject(new Error('error')); return; }
+      let settled = false, myId = null, hostConn = null, alive = true, deliverT = null, sendT = null, bT = null;
+      const conns = new Map(), pres = new Map(), peerHs = [], errHs = [], banned = new Set();
+      let mine = {}, myU = Date.now(), snap = Object.freeze([]);
+      const timer = setTimeout(() => fail('timeout'), TOTAL_MS);
+      const slowSig = setTimeout(() => { if (!myId && !settled) say('Reaching the matchmaking server… hang on'); }, 8000);
+      function fail(c) {
+        if (!settled) { settled = true; clearTimeout(timer); alive = false; try { peer.destroy(); } catch (e) {} reject(new Error(c)); }
+        else if (alive) { alive = false; const hs = errHs.splice(0); try { peer.destroy(); } catch (e) {} hs.forEach(h => { try { h({ code: 'upstream_error', message: c }); } catch (e) {} }); }
+      }
+      function rebuild() {
+        const list = [{ id: myId, p: mine, u: myU }, ...[...pres].map(([id, v]) => ({ id, p: v.p, u: v.u }))];
+        snap = Object.freeze(list.map(x => Object.freeze({ peer: x.id, by: null, isMe: x.id === myId, sameTab: x.id === myId, kind: 'viewer', guest: false, presence: Object.freeze(x.p), updatedAt: x.u })));
+        if (!deliverT) deliverT = setTimeout(() => { deliverT = null; const ch = { peers: snap, joined: [], left: [], updated: [] }; peerHs.slice().forEach(h => { try { h(ch); } catch (e) { console.error(e); } }); }, 0);
+      }
+      function remote(id, p) {
+        if (!p || typeof p !== 'object') return;
+        const j = JSON.stringify(p); if (j.length > 6000) return;
+        const prev = pres.get(id); if (!prev || prev.j !== j) pres.set(id, { p: JSON.parse(j), u: Date.now(), j });
+      }
+      function bcast() {
+        if (bT) return;
+        bT = setTimeout(() => { bT = null; const all = [[myId, mine], ...[...pres].map(([id, v]) => [id, v.p])]; for (const c of conns.values()) { try { if (c.open) c.send({ t: 's', all }); } catch (e) {} } }, 40);
+      }
+      function sendMine() {
+        if (sendT) return;
+        sendT = setTimeout(() => { sendT = null; try { if (hostConn && hostConn.open) hostConn.send({ t: 'p', p: mine }); } catch (e) {} }, 33);
+      }
+      const api = {
+        p2p: true,
+        hostPeerId: () => hostId,
+        peers: () => snap,
+        presence(patch) { const nx = { ...mine }; for (const k in patch) { if (patch[k] === null) delete nx[k]; else nx[k] = patch[k]; } mine = JSON.parse(JSON.stringify(nx)); myU = Date.now(); rebuild(); if (create) bcast(); else sendMine(); return Promise.resolve(); },
+        onPeers(h, onErr) { peerHs.push(h); if (onErr) errHs.push(onErr); setTimeout(() => h({ peers: snap, joined: [], left: [], updated: [] }), 0); return () => {}; },
+        connected: () => alive, onConnection(h) { setTimeout(() => h(alive)); return () => {}; },
+        emit: async () => {}, on: () => () => {},
+        kick(id) { if (!create) return; banned.add(id); const c = conns.get(id); conns.delete(id); pres.delete(id); if (c) { try { c.close(); } catch (e) {} } rebuild(); bcast(); },
+        async leave() { alive = false; peerHs.length = 0; errHs.length = 0; try { peer.destroy(); } catch (e) {} },
+      };
+      peer.on('error', e => {
+        const t = e && e.type;
+        if (settled) { if (t !== 'peer-unavailable') console.warn('peer', t); return; }
+        if (t === 'peer-unavailable' && !create) { if (++missTries < 3) { say('Looking for that server…'); setTimeout(tryConnect, 2000); return; } }
+        fail(t === 'unavailable-id' ? 'taken' : t === 'peer-unavailable' ? 'notfound' : (t === 'network' || t === 'server-error' || t === 'socket-error' || t === 'socket-closed') ? 'server' : (t || 'error'));
+      });
+      let attempt = 0, missTries = 0;
+      function onHostData(m) {
+        if (!m || m.t !== 's' || !Array.isArray(m.all)) return;
+        const seen = new Set();
+        for (const row of m.all.slice(0, 16)) { if (!Array.isArray(row) || typeof row[0] !== 'string' || row[0] === myId) continue; seen.add(row[0]); remote(row[0], row[1]); }
+        for (const id of [...pres.keys()]) if (!seen.has(id)) pres.delete(id);
+        rebuild();
+      }
+      function tryConnect() {
+        if (settled || !alive) return;
+        attempt++;
+        if (attempt > 1) say(`Still connecting… try ${attempt} of ${CONNECT_TRIES}`);
+        let c;
+        try { c = peer.connect(hostId, { reliable: true, serialization: 'json' }); } catch (e) { fail('error'); return; }
+        hostConn = c;
+        const retry = why => {
+          clearTimeout(tt);
+          if (settled || hostConn !== c) return;
+          try { c.close(); } catch (e) {}
+          if (attempt < CONNECT_TRIES) setTimeout(tryConnect, 600); else fail(why);
+        };
+        const tt = setTimeout(() => { if (!c.open) retry('timeout'); }, TRY_MS);
+        c.on('open', () => { clearTimeout(tt); if (settled || hostConn !== c) return; settled = true; clearTimeout(timer); clearTimeout(slowSig); resolve(api); sendMine(); });
+        c.on('data', m => { if (hostConn === c) onHostData(m); });
+        c.on('close', () => { if (settled && hostConn === c) fail('host left'); });
+        c.on('error', () => { if (!settled) retry('nat'); });
+        c.on('iceStateChanged', st => { if (st === 'failed' && !c.open) retry('nat'); });
+      }
+      peer.on('open', id => {
+        myId = id; rebuild(); clearTimeout(slowSig);
+        if (create) {
+          settled = true; clearTimeout(timer); clearTimeout(slowSig); resolve(api);
+          peer.on('connection', c => {
+            c.on('open', () => { if (conns.size >= 11 || banned.has(c.peer)) { try { c.close(); } catch (e) {} return; } conns.set(c.peer, c); bcast(); });
+            c.on('data', m => { if (m && m.t === 'p') { remote(c.peer, m.p); rebuild(); bcast(); } });
+            c.on('close', () => { conns.delete(c.peer); pres.delete(c.peer); rebuild(); bcast(); });
+          });
+        } else {
+          tryConnect();
+        }
+      });
+      peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) {} });
+    });
+  }
+
+
+  // ---- same-wifi mode (served by jelly_server.py on your network) ----
+  function lanLobby() { return { p2p: true, lan: true, peers: () => [], onPeers: () => () => {}, presence: async () => {}, join: (name, create, say) => lanJoin(String(name).replace(/^jd-/, ''), create, say) }; }
+  async function lanJoin(code, create, say) {
+    const post = (path, body) => fetch('/jd-lan/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    let res;
+    try { res = await post('join', { code, create: !!create }); } catch (e) { throw new Error('server'); }
+    if (res.status === 409) throw new Error('taken');
+    if (res.status === 404) throw new Error('notfound');
+    if (res.status === 403) throw new Error('full');
+    if (!res.ok) throw new Error('server');
+    const j = await res.json(), myId = String(j.id);
+    let hostId = String(j.host), mine = {}, myU = Date.now(), snap = Object.freeze([]), alive = true, deliverT = null, sendT = null;
+    const pres = new Map(), peerHs = [], errHs = [];
+    const es = new EventSource(`/jd-lan/events?code=${encodeURIComponent(code)}&id=${encodeURIComponent(myId)}`);
+    function dead(why) { if (!alive) return; alive = false; clearInterval(hb); try { es.close(); } catch (e) {} const hs = errHs.splice(0); hs.forEach(h => { try { h({ code: 'upstream_error', message: why }); } catch (e) {} }); }
+    function rebuild() {
+      const list = [{ id: myId, p: mine, u: myU }, ...[...pres].map(([id, v]) => ({ id, p: v.p, u: v.u }))];
+      snap = Object.freeze(list.map(x => Object.freeze({ peer: x.id, by: null, isMe: x.id === myId, sameTab: x.id === myId, kind: 'viewer', guest: false, presence: Object.freeze(x.p), updatedAt: x.u })));
+      if (!deliverT) deliverT = setTimeout(() => { deliverT = null; const ch = { peers: snap, joined: [], left: [], updated: [] }; peerHs.slice().forEach(h => { try { h(ch); } catch (e) { console.error(e); } }); }, 0);
+    }
+    function send() { if (sendT || !alive) return; sendT = setTimeout(() => { sendT = null; post('pres', { code, id: myId, p: mine }).then(r => { if (r.status === 410) dead('host left'); }, () => {}); }, 80); }
+    const hb = setInterval(send, 3000);
+    await new Promise((resolve, reject) => {
+      const t = setTimeout(() => { try { es.close(); } catch (e) {} clearInterval(hb); reject(new Error('timeout')); }, 10000);
+      es.onopen = () => { clearTimeout(t); resolve(); };
+    });
+    es.onmessage = e => {
+      let m; try { m = JSON.parse(e.data); } catch (x) { return; }
+      if (m.closed) return dead('host left');
+      if (m.kicked) return dead('kicked');
+      if (typeof m.host === 'string') hostId = m.host;
+      if (!Array.isArray(m.all)) return;
+      const seen = new Set();
+      for (const row of m.all.slice(0, 16)) {
+        if (!Array.isArray(row) || typeof row[0] !== 'string' || row[0] === myId || !row[1] || typeof row[1] !== 'object') continue;
+        seen.add(row[0]); const jj = JSON.stringify(row[1]); const prev = pres.get(row[0]);
+        if (!prev || prev.j !== jj) pres.set(row[0], { p: row[1], u: Date.now(), j: jj });
+      }
+      for (const id of [...pres.keys()]) if (!seen.has(id)) pres.delete(id);
+      rebuild();
+    };
+    es.onerror = () => { if (es.readyState === 2) dead('host left'); };
+    rebuild(); send();
+    return {
+      p2p: true, lan: true,
+      hostPeerId: () => hostId,
+      peers: () => snap,
+      presence(patch) { const nx = { ...mine }; for (const k in patch) { if (patch[k] === null) delete nx[k]; else nx[k] = patch[k]; } mine = JSON.parse(JSON.stringify(nx)); myU = Date.now(); rebuild(); send(); return Promise.resolve(); },
+      onPeers(h, onErr) { peerHs.push(h); if (onErr) errHs.push(onErr); setTimeout(() => h({ peers: snap, joined: [], left: [], updated: [] }), 0); return () => {}; },
+      connected: () => alive, onConnection(h) { setTimeout(() => h(alive)); return () => {}; },
+      emit: async () => {}, on: () => () => {},
+      kick(id) { post('kick', { code, id: myId, target: id }).catch(() => {}); },
+      async leave() { alive = false; clearInterval(hb); peerHs.length = 0; errHs.length = 0; try { es.close(); } catch (e) {} post('leave', { code, id: myId }).catch(() => {}); },
+    };
+  }
+  async function lanAvailable() {
+    if (!/^https?:$/.test(location.protocol)) return false;
+    try {
+      const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 1500);
+      const r = await fetch('/jd-lan/ping', { signal: ac.signal, cache: 'no-store' }); clearTimeout(t);
+      if (!r.ok) return false; const j = await r.json(); return !!(j && j.ok);
+    } catch (e) { return false; }
+  }
+
+  (async () => {
+    try { if (window.claude && typeof window.claude.use === 'function') room = await window.claude.use('room'); } catch (e) { room = null; }
+    if (room) {
+      $('mpStatus').textContent = 'Make a server and send the code to your friends, or join one below.';
+      $('mpActions').hidden = false;
+      room.onPeers(renderServers, () => { $('mpStatus').textContent = 'Multiplayer is not available right now.'; $('mpActions').hidden = true; });
+      return;
+    }
+    if (window.claude) { $('mpStatus').textContent = 'Multiplayer works on claude.ai for people this page is shared with, or in the downloaded file.'; return; }
+    if (await lanAvailable()) {
+      room = lanLobby();
+      $('mpStatus').textContent = 'Same-wifi mode 📶 Make a server here. Friends on your wifi open this same address and join with the code.';
+      $('mpActions').hidden = false;
+      $('mpServers').hidden = true; $('mpServers').previousElementSibling.hidden = true;
+      return;
+    }
+    // downloaded / standalone: peer-to-peer over the internet
+    try {
+      if (!window.Peer) { try { await loadScript('https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'); } catch (e) { await loadScript('https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js'); } }
+    } catch (e) {}
+    if (!window.Peer) { $('mpStatus').textContent = 'Could not load multiplayer. Check your internet and reload.'; return; }
+    room = p2pLobby();
+    $('mpStatus').textContent = 'Make a server and send the code to your friends. They open their own copy of this file and join with it.';
+    $('mpActions').hidden = false;
+    $('mpServers').hidden = true; $('mpServers').previousElementSibling.hidden = true;
+  })();
+  $('mpNick').value = save.name;
+  $('mpNick').addEventListener('input', e => { save.name = e.target.value.slice(0, 12); persist(); $('nameInput').value = save.name; if (mp) mp.r.presence({ nick: myNick() }).catch(() => {}); });
+
+  function renderServers() {
+    if (!room) return;
+    const box = $('mpServers'), seen = new Set(); box.innerHTML = '';
+    for (const p of room.peers()) {
+      const srv = p.presence && p.presence.srv;
+      if (!srv || typeof srv.code !== 'string' || !/^[a-z0-9]{3,8}$/.test(srv.code) || seen.has(srv.code)) continue;
+      seen.add(srv.code);
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'srv'; b.id = 'srv-' + srv.code;
+      const left = document.createElement('span'); left.textContent = `${MPMODES[srv.mode] ? MPMODES[srv.mode].name : 'Race'} · ${Math.max(1, Math.min(99, +srv.n || 1))} ${(+srv.n || 1) === 1 ? 'jelly' : 'jellies'}${srv.st && srv.st !== 'lobby' ? ' · in a round' : ''}`;
+      const code = document.createElement('b'); code.textContent = srv.code.toUpperCase();
+      b.append(left, code);
+      b.onclick = () => joinServer(srv.code);
+      box.appendChild(b);
+    }
+    if (!seen.size) box.innerHTML = '<span class="tip" style="color:var(--muted)">no open servers yet, make one!</span>';
+  }
+
+  function makeCode() { const a = 'abcdefghjkmnpqrstuvwxyz23456789'; let c = ''; for (let i = 0; i < 5; i++) c += a[Math.floor(Math.random() * a.length)]; return c; }
+  $('mpCreate').onclick = () => { sfx.tick(); joinServer(makeCode(), true); };
+  $('mpJoin').onclick = () => joinServer($('mpCode').value);
+  $('mpCode').addEventListener('keydown', e => { if (e.key === 'Enter') joinServer($('mpCode').value); });
+
+  async function joinServer(code, create, tries = 0) {
+    if (!room) return;
+    code = String(code || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8);
+    if (code.length < 3) { toast('Server codes are 3 to 8 letters'); sfx.bonk(); return; }
+    if (mp) await leaveServer(true);
+    initAudio();
+    let r;
+    if (room.p2p) toast(create ? 'Opening your server…' : 'Connecting…');
+    try { r = await room.join('jd-' + code, !!create, msg => toast(msg)); }
+    catch (e) {
+      const m = e && e.message;
+      if (m === 'taken' && create && tries < 3) return joinServer(makeCode(), true, tries + 1);
+      toast(m === 'notfound' ? 'No server with that code. Check it and try again'
+        : m === 'nat' || m === 'timeout' ? "Couldn't link up with that server. Try again, or switch one of you to home wifi or a phone hotspot"
+        : m === 'full' ? 'That server is full (12 jellies max)'
+        : m === 'server' ? (room && room.lan ? 'Could not reach the wifi server. Is jelly_server.py still running?' : 'The matchmaking server is busy. Try again in a few seconds')
+        : 'Could not join that server. Try again in a sec');
+      sfx.bonk(); return;
+    }
+    mp = { code, r, joinedAt: Date.now() }; race = null; seenEpoch = -1; shownResults = -1; myReady = false; mpRun = null;
+    r.presence({ nick: myNick(), skin: skinKey, hat: save.hat, face: save.face, custom: skinKey === 'custom' ? save.custom : null, since: Date.now(), ready: false, run: null, race: null }).catch(() => {});
+    r.onPeers(onMpPeers, e => { if (mp && mp.r === r) { toast(e && e.message === 'kicked' ? 'The host removed you from the server' : e && e.message === 'host left' ? 'The host closed the server' : 'Lost the server connection'); leaveServer(); } });
+    state = 'menu'; reset(); showMp('lobby'); renderLobby(); sfx.power();
+  }
+
+  async function leaveServer(quiet) {
+    if (!mp) return;
+    const r = mp.r; mp = null; mpRun = null; race = null; meIsHost = false; rngFn = Math.random;
+    try { await r.leave(); } catch (e) {}
+    if (room) room.presence({ srv: null }).catch(() => {});
+    showMp(null); $('mpExit').hidden = true;
+    if (!quiet) { state = 'menu'; reset(); $('menu').hidden = false; showTab('multi'); renderAll(); }
+  }
+  $('mpLeave').onclick = () => { sfx.tick(); leaveServer(); };
+  $('resLeave').onclick = () => { sfx.tick(); leaveServer(); };
+  $('mpExit').onclick = () => { sfx.tick(); leaveServer(); };
+  $('copyCode').onclick = () => {
+    const txt = mp ? mp.code.toUpperCase() : '';
+    const ok = () => toast('Code copied!');
+    try { navigator.clipboard.writeText(txt).then(ok, () => selectCode()); } catch (e) { selectCode(); }
+  };
+  function selectCode() { const r = document.createRange(); r.selectNodeContents($('lobbyCode')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('Code selected, copy it from there'); }
+
+  function pushRace() { if (mp && meIsHost && race) mp.r.presence({ race }).catch(() => {}); }
+
+  function onMpPeers() {
+    if (!mp) return;
+    const ps = mpPlayers(); if (!ps.length) return;
+    const since = p => (typeof p.presence.since === 'number' ? p.presence.since : 9e15);
+    const sorted = [...ps].sort((a, b) => since(a) - since(b) || (a.peer < b.peer ? -1 : 1));
+    const hid = mp.r.hostPeerId ? mp.r.hostPeerId() : null;
+    hostPeer = (hid && ps.find(p => p.peer === hid)) || sorted[0]; meIsHost = !!hostPeer.sameTab;
+    const me = meP();
+    if (meIsHost) {
+      if (!race) race = { epoch: 0, status: 'lobby', mode: 'race', rounds: 3, round: 0, scores: {}, standings: [], nicks: {} };
+      if (!me || !me.presence.race) pushRace();
+      if (room) room.presence({ srv: { code: mp.code, n: ps.length, mode: race.mode, st: race.status } }).catch(() => {});
+    } else {
+      const hr = hostPeer.presence.race;
+      if (hr && typeof hr === 'object') race = hr;
+      if (me && race && Array.isArray(race.kicked) && race.kicked.includes(me.peer)) { toast('The host removed you from the server'); sfx.bonk(); leaveServer(); return; }
+      if (me && me.presence.race) mp.r.presence({ race: null }).catch(() => {});
+      if (room) room.presence({ srv: null }).catch(() => {});
+    }
+    applyRace(); renderLobby();
+  }
+
+  function applyRace() {
+    if (!race || !mp) return;
+    const fresh = Date.now() - mp.joinedAt < 1500;
+    if (race.status === 'countdown' && race.epoch !== seenEpoch) {
+      seenEpoch = race.epoch;
+      if (fresh && !meIsHost) { showMp('lobby'); return; }
+      startMpRound();
+    } else if ((race.status === 'results' || race.status === 'final') && shownResults !== race.epoch) {
+      shownResults = race.epoch; showResults();
+    } else if (race.status === 'lobby' && (mpRun || $('mpLobby').hidden)) {
+      mpRun = null; state = 'menu'; showMp('lobby');
+    }
+  }
+
+  function renderLobby() {
+    if (!mp) return;
+    $('lobbyCode').textContent = mp.code.toUpperCase();
+    const r = race || { mode: 'race', rounds: 3, scores: {} };
+    const mm = $('mpModes'); mm.innerHTML = '';
+    for (const [k, m] of Object.entries(MPMODES)) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'mode'; b.id = 'mpmode-' + k;
+      b.innerHTML = '<strong></strong><span></span>'; b.querySelector('strong').textContent = m.name; b.querySelector('span').textContent = m.desc;
+      b.setAttribute('aria-pressed', r.mode === k); b.disabled = !meIsHost;
+      b.onclick = () => { if (!meIsHost) return; race = { ...race, mode: k }; pushRace(); sfx.tick(); renderLobby(); };
+      mm.appendChild(b);
+    }
+    const rc = $('mpRounds'); rc.innerHTML = '';
+    for (const n of [1, 3, 5, 7]) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.id = 'mprounds-' + n; b.textContent = n;
+      b.setAttribute('aria-pressed', r.rounds === n); b.disabled = !meIsHost;
+      b.onclick = () => { if (!meIsHost) return; race = { ...race, rounds: n }; pushRace(); sfx.tick(); renderLobby(); };
+      rc.appendChild(b);
+    }
+    const ps = mpPlayers();
+    $('lobbyCount').textContent = `${ps.length} ${ps.length === 1 ? 'jelly' : 'jellies'} here`;
+    fillPlist($('plist'), ps.map(p => ({ p, act: meIsHost && !p.sameTab ? () => kickPlayer(p) : null, val: (r.scores && r.scores[p.peer]) ? r.scores[p.peer] + ' pts' : '', sub: (hostPeer && p.peer === hostPeer.peer ? 'host' : '') + (p.presence.ready ? (hostPeer && p.peer === hostPeer.peer ? ' · ' : '') + 'ready!' : '') })));
+    const st = $('mpStart');
+    if (meIsHost) {
+      st.textContent = ps.length < 2 ? 'Need 2+ jellies' : 'Start ' + MPMODES[r.mode].name.toLowerCase();
+      st.disabled = ps.length < 2;
+      $('lobbyNote').textContent = ps.length < 2 ? 'Send the code to a friend. They join from the Multi tab.' : 'You are the host. Pick a mode and start when everyone is in.';
+    } else {
+      st.disabled = false; st.textContent = myReady ? 'Not ready' : "I'm ready";
+      $('lobbyNote').textContent = 'Waiting for the host to start…';
+    }
+  }
+  function kickPlayer(p) {
+    if (!meIsHost || !race || !mp) return;
+    const peer = p.peer, nick = nickOf(p);
+    race = { ...race, kicked: [...(Array.isArray(race.kicked) ? race.kicked : []).filter(x => x !== peer).slice(-30), peer] };
+    pushRace(); sfx.bonk(); toast(`Removed ${nick}`);
+    if (mp.r.kick) setTimeout(() => { try { mp.r.kick(peer); } catch (e) {} }, 500);
+    renderLobby();
+  }
+  function fillPlist(el, rows) {
+    el.innerHTML = '';
+    for (const { p, nick, val, sub, color, act } of rows) {
+      const d = document.createElement('div'); d.className = 'prow' + (p && p.sameTab ? ' me' : '');
+      const dot = document.createElement('div'); dot.className = 'dot'; dot.style.background = color || colorOf(p.presence);
+      const n = nick || nickOf(p); dot.textContent = n[0].toUpperCase();
+      const mid = document.createElement('div');
+      const st = document.createElement('strong'); st.textContent = n + (p && p.sameTab ? ' (you)' : '');
+      const sp = document.createElement('span'); sp.textContent = sub || '';
+      mid.append(st, document.createElement('br'), sp);
+      const b = document.createElement('b'); b.textContent = val || '';
+      d.append(dot, mid, b);
+      if (act) {
+        const k = document.createElement('button'); k.type = 'button'; k.className = 'kick'; k.textContent = 'Remove'; k.id = 'kick-' + p.peer;
+        let sure = false, st = null;
+        k.onclick = () => {
+          if (!sure) { sure = true; k.textContent = 'Sure?'; k.classList.add('sure'); st = setTimeout(() => { sure = false; k.textContent = 'Remove'; k.classList.remove('sure'); }, 3000); return; }
+          clearTimeout(st); act();
+        };
+        d.appendChild(k);
+      } else d.appendChild(document.createElement('span'));
+      el.appendChild(d);
+    }
+  }
+  $('mpStart').onclick = () => {
+    if (!mp) return;
+    if (!meIsHost) { myReady = !myReady; mp.r.presence({ ready: myReady }).catch(() => {}); sfx.tick(); renderLobby(); return; }
+    hostStartRound(true);
+  };
+  function hostStartRound(newMatch) {
+    if (!meIsHost || !race) return;
+    if (mpPlayers().length < 2) { toast('You need at least 2 jellies'); sfx.bonk(); return; }
+    race = { ...race, epoch: race.epoch + 1, status: 'countdown', seed: Math.floor(Math.random() * 2147483647),
+      round: newMatch ? 1 : race.round + 1, scores: newMatch ? {} : race.scores, standings: [] };
+    firstDoneAt = 0; graceAt = 0;
+    pushRace(); applyRace();
+  }
+  $('resNext').onclick = () => { if (!race) return; sfx.tick(); hostStartRound(race.status === 'final'); };
+  $('resLobby').onclick = () => { if (!meIsHost || !race) return; sfx.tick(); race = { ...race, status: 'lobby', epoch: race.epoch + 1 }; pushRace(); applyRace(); renderLobby(); };
+
+  function startMpRound() {
+    initAudio();
+    state = 'play'; reset();
+    mpRun = { e: race.epoch, d: 0, alive: true, done: false, t: 0, stun: 0 };
+    rngFn = mulberry(race.seed | 0); mpNext = FIRST; mpIdx = 0; finishWx = 0;
+    mpStartAt = (meIsHost ? Date.now() : (hostPeer && hostPeer.updatedAt) || Date.now()) + CD_MS;
+    myReady = false;
+    showMp('play'); buildBar();
+    mp.r.presence({ ready: false, run: packRun() }).catch(() => {});
+  }
+  const packRun = () => ({ e: mpRun.e, d: Math.round(mpRun.d), y: +(Math.max(0, Math.min(1, jelly.y / H))).toFixed(3), a: mpRun.alive, f: mpRun.done, t: Math.round(mpRun.t), p: score });
+
+  function mpCrash() {
+    if (race.mode === 'survival') {
+      mpRun.alive = false; mpRun.t = Date.now() - mpStartAt; shake = 10; jelly.flash = 1; sfx.hit();
+      banner('You crashed! Spectating…');
+      mp.r.presence({ run: packRun() }).catch(() => {});
+      return;
+    }
+    mpRun.stun = 70; jelly.inv = 140; shake = 6; combo = 0; jelly.vy = -5 * S(); sfx.bonk();
+    addText(jelly.x, jelly.y - jelly.r * 2, 'stunned!', '#ff9aa8');
+  }
+
+  function updateMp(dt) {
+    const s = S(), now = Date.now(), floor = H - 40 * s, mode = race.mode;
+    if (now < mpStartAt) {
+      jelly.y = H * .45 + Math.sin(t * .05) * 6 * s; jelly.vy = 0;
+      const c = Math.ceil((mpStartAt - now) / 1000);
+      banner(c > 3 ? MPMODES[mode].name + '!' : String(c));
+      barT -= dt; if (barT <= 0) { barT = 6; updateBar(); }
+      return;
+    }
+    const elapsed = now - mpStartAt;
+    if (elapsed < 900 && !mpRun.done && mpRun.alive) banner('GO!');
+    else if (!mpRun.done && mpRun.alive && $('mpBanner').textContent === 'GO!') banner('');
+    const out = !mpRun.alive || mpRun.done;
+    if (!out) {
+      jelly.vy = Math.min(jelly.vy + 0.36 * s * gMul() * dt, 9 * s * (save.codes.MOON ? .7 : 1));
+      jelly.y += jelly.vy * dt;
+      if (jelly.y < jelly.r) { jelly.y = jelly.r; jelly.vy = 0; }
+    } else if (!mpRun.alive) {
+      jelly.vy = Math.min(jelly.vy + .3 * s * dt, 6 * s); jelly.y = Math.min(jelly.y + jelly.vy * dt, floor - jelly.r * .6);
+    } else jelly.y += (H * .45 - jelly.y) * .05 * dt;
+    if (jelly.inv > 0) jelly.inv -= dt;
+    if (active.magnet > 0) active.magnet -= dt;
+    if (comboT > 0) { comboT -= dt; if (comboT <= 0) combo = 0; }
+    if (mpRun.stun > 0) mpRun.stun -= dt;
+    speed = (mode === 'survival' ? 2.8 + Math.min(mpRun.d / 2500, 2.4) : mode === 'rush' ? 2.8 : 3.1) * s;
+    if (mpRun.stun > 0 || out) speed = 0;
+    mpRun.d += speed / s * dt;
+    while (!finishWx && mpNext - mpRun.d < (W - jelly.x) / s + 120) {
+      spawnGate(jelly.x + (mpNext - mpRun.d) * s, mpIdx);
+      mpIdx++; mpNext += SPACING;
+      if (mode === 'race' && mpIdx >= RACE_GATES) finishWx = FINISH;
+    }
+    stepObjects(dt, s, floor, MODES.classic);
+    if (!out && jelly.y + jelly.r * .6 > floor) { jelly.y = floor - jelly.r * .6; jelly.vy = -6 * s; hurt(); }
+    if (mode === 'race' && !mpRun.done && mpRun.d >= FINISH) {
+      mpRun.done = true; mpRun.t = elapsed; sfx.win(); burst(jelly.x, jelly.y, '255,226,122', 30);
+      banner(`Finished in ${(elapsed / 1000).toFixed(1)}s!`); mp.r.presence({ run: packRun() }).catch(() => {});
+    }
+    if (mode === 'rush' && !mpRun.done && elapsed >= RUSH_MS) {
+      mpRun.done = true; mpRun.t = elapsed; sfx.win(); banner(`Time! ${score} points`); mp.r.presence({ run: packRun() }).catch(() => {});
+    }
+    pushT -= dt; if (pushT <= 0) { pushT = 4; mp.r.presence({ run: packRun() }).catch(() => {}); }
+    barT -= dt; if (barT <= 0) { barT = 6; updateBar(); }
+    hudT -= dt; if (hudT <= 0) { updateHud(); hudT = 6; }
+  }
+
+  function runsNow() {
+    return mpPlayers().map(p => ({ p, peer: p.peer, nick: nickOf(p), r: p.sameTab && mpRun ? packRun() : p.presence.run }))
+      .filter(x => x.r && race && x.r.e === race.epoch);
+  }
+  function metric(x, mode) {
+    const r = x.r;
+    if (mode === 'race') return r.f ? 1e9 - (+r.t || 0) : (+r.d || 0);
+    if (mode === 'survival') return r.a !== false ? 1e9 + (+r.d || 0) : (+r.d || 0);
+    return +r.p || 0;
+  }
+  function buildBar() { $('mpTrack').querySelectorAll('.mk').forEach(n => n.remove()); $('mpFlag').hidden = race.mode !== 'race'; updateBar(); }
+  function updateBar() {
+    if (!mp || !race) return;
+    const mode = race.mode, runs = runsNow(), track = $('mpTrack');
+    const maxV = Math.max(1, ...runs.map(x => mode === 'rush' ? (+x.r.p || 0) : (+x.r.d || 0)));
+    const seen = new Set();
+    for (const x of runs) {
+      seen.add(x.peer);
+      let el = track.querySelector(`[data-peer="${x.peer}"]`);
+      if (!el) { el = document.createElement('div'); el.className = 'mk'; el.dataset.peer = x.peer; el.style.background = colorOf(x.p.presence); el.textContent = x.nick[0].toUpperCase(); track.appendChild(el); }
+      const v = mode === 'race' ? Math.min(1, (+x.r.d || 0) / FINISH) : (mode === 'rush' ? (+x.r.p || 0) : (+x.r.d || 0)) / maxV;
+      el.style.left = (4 + v * 92) + '%';
+      el.classList.toggle('me', !!x.p.sameTab); el.classList.toggle('out', x.r.a === false);
+    }
+    track.querySelectorAll('.mk').forEach(n => { if (!seen.has(n.dataset.peer)) n.remove(); });
+    const sorted = [...runs].sort((a, b) => metric(b, mode) - metric(a, mode));
+    const place = sorted.findIndex(x => x.p.sameTab) + 1;
+    if (mode === 'survival') { const alive = runs.filter(x => x.r.a !== false).length; mpPlaceText = `alive <b>${alive}/${runs.length}</b>`; }
+    else if (mode === 'rush') { const left = Math.max(0, Math.ceil((RUSH_MS - (Date.now() - mpStartAt)) / 1000)); mpPlaceText = `${place ? ord(place) : '-'} · <b>${Math.min(45, left)}s</b>`; }
+    else mpPlaceText = `place <b>${place ? ord(place) + ' / ' + runs.length : '-'}</b>`;
+    setSub();
+  }
+
+  function drawFinish() {
+    if (!finishWx) return;
+    const s = S(), x = jelly.x + (FINISH - mpRun.d) * s;
+    if (x < -40 || x > W + 40) return;
+    const sz = 10 * s, cols = 3;
+    for (let yy = 0, i = 0; yy < H - 40 * s; yy += sz, i++) for (let c = 0; c < cols; c++) { ctx.fillStyle = (i + c) % 2 ? 'rgba(20,20,42,.75)' : 'rgba(255,255,255,.85)'; ctx.fillRect(x + c * sz, yy, sz, sz); }
+  }
+  function drawGhosts() {
+    const s = S();
+    for (const p of mpPlayers()) {
+      if (p.sameTab) continue;
+      const run = p.presence.run, pr = p.presence;
+      if (!run || run.e !== mpRun.e) continue;
+      const x = jelly.x + ((+run.d || 0) - mpRun.d) * s; if (!(x > -80 && x < W + 80)) continue;
+      const y = Math.max(0, Math.min(1, +run.y || .5)) * H;
+      const skin = SKINS[pr.skin] && !SKINS[pr.skin].custom ? pr.skin : 'bubblegum';
+      drawJellyAt(ctx, x, y, jelly.r, { phase: jelly.phase + 1.7, skin, hat: HATS[pr.hat] ? pr.hat : 'none', style: FACES[pr.face] ? pr.face : 'normal', alpha: run.a === false ? .25 : .55, face: run.a === false ? 'dead' : 'happy' });
+      ctx.save(); ctx.globalAlpha = .9; ctx.textAlign = 'center'; ctx.font = `800 ${Math.round(10 * s + 5)}px Nunito, system-ui, sans-serif`; ctx.fillStyle = colorOf(pr);
+      ctx.fillText(nickOf(p), x, y - jelly.r * 1.5 - 4 * s); ctx.restore();
+    }
+  }
+
+  // host keeps the round moving
+  setInterval(() => {
+    if (!mp || !meIsHost || !race || race.status !== 'countdown') return;
+    const now = Date.now(); if (now < mpStartAt + 1500) return;
+    const runs = runsNow(), mode = race.mode;
+    if (!runs.length) { race = { ...race, status: 'lobby', epoch: race.epoch + 1 }; pushRace(); applyRace(); return; }
+    let over = now > mpStartAt + 300000;
+    if (mode === 'race') {
+      if (runs.some(x => x.r.f) && !firstDoneAt) firstDoneAt = now;
+      if (runs.every(x => x.r.f) || (firstDoneAt && now - firstDoneAt > 20000)) over = true;
+    } else if (mode === 'survival') {
+      const alive = runs.filter(x => x.r.a !== false).length;
+      if ((runs.length >= 2 && alive <= 1) || alive === 0) { if (!graceAt) graceAt = now; if (now - graceAt > 1500) over = true; } else graceAt = 0;
+    } else if (runs.every(x => x.r.f) || now > mpStartAt + RUSH_MS + 3000) over = true;
+    if (over) endRound(runs);
+  }, 500);
+
+  function endRound(runs) {
+    const mode = race.mode;
+    runs.sort((a, b) => metric(b, mode) - metric(a, mode));
+    const gain = [3, 2, 1], scores = { ...(race.scores || {}) }, nicks = { ...(race.nicks || {}) };
+    const standings = runs.map((x, i) => {
+      const g = runs.length >= 2 ? (gain[i] || 0) : 0, r = x.r;
+      scores[x.peer] = (scores[x.peer] || 0) + g; nicks[x.peer] = x.nick;
+      const val = mode === 'race' ? (r.f ? ((+r.t || 0) / 1000).toFixed(1) + 's' : Math.round(Math.min(1, (+r.d || 0) / FINISH) * 100) + '%')
+        : mode === 'survival' ? (r.a !== false ? 'survived!' : ((+r.t || 0) / 1000).toFixed(1) + 's') : (+r.p || 0) + ' pts';
+      return { peer: x.peer, nick: x.nick, val, g, c: colorOf(x.p.presence) };
+    });
+    race = { ...race, status: race.round >= race.rounds ? 'final' : 'results', standings, scores, nicks };
+    pushRace(); applyRace();
+  }
+
+  function showResults() {
+    const me = meP(), myPeer = me ? me.peer : null;
+    const st = Array.isArray(race.standings) ? race.standings.slice(0, 16) : [];
+    const idx = st.findIndex(x => x.peer === myPeer);
+    if (mpRun && idx >= 0) {
+      const coins = (idx < 3 && st.length >= 2 ? [100, 60, 40][idx] : 20) + runPearls;
+      save.pearls += coins; persist(); toast(`${ord(idx + 1)} place! +${coins} coins`);
+      if (idx === 0) sfx.win(); else sfx.tick();
+    }
+    mpRun = null; state = 'menu'; banner(''); reset();
+    const final = race.status === 'final';
+    $('resRound').textContent = `round ${race.round} of ${race.rounds} · ${MPMODES[race.mode] ? MPMODES[race.mode].name : ''}`;
+    if (final) {
+      const tops = Object.entries(race.scores || {}).sort((a, b) => b[1] - a[1]);
+      const champ = tops.length ? cleanNick((race.nicks || {})[tops[0][0]]) : 'Nobody';
+      $('resTitle').textContent = `${champ} wins!!`;
+      fillPlist($('resList'), tops.slice(0, 16).map(([peer, sc]) => ({ p: { sameTab: peer === myPeer, presence: {} }, nick: cleanNick((race.nicks || {})[peer]), val: sc + ' pts', sub: 'match total', color: (st.find(x => x.peer === peer) || {}).c || '#ff8fd8' })));
+      if (tops.length && tops[0][0] === myPeer) { burst(W / 2, H / 3, '255,226,122', 40); burst(W / 2, H / 3, '255,143,216', 40); }
+    } else {
+      $('resTitle').textContent = st.length ? `${cleanNick(st[0].nick)} takes it!` : 'Round over';
+      fillPlist($('resList'), st.map((x, i) => ({ p: { sameTab: x.peer === myPeer, presence: {} }, nick: cleanNick(x.nick), val: (race.scores[x.peer] || 0) + ' pts', sub: `${ord(i + 1)} · ${String(x.val).slice(0, 12)}${x.g ? ' · +' + x.g : ''}`, color: /^#[0-9a-f]{6}$/i.test(x.c) ? x.c : '#ff8fd8' })));
+    }
+    $('resNext').hidden = !meIsHost; $('resLobby').hidden = !meIsHost;
+    $('resNext').textContent = final ? 'New match' : 'Next round';
+    $('resNote').textContent = meIsHost ? (mpPlayers().length < 2 ? 'Everyone else left. Head back to the lobby.' : '') : 'Waiting for the host…';
+    showMp('results');
+  }
+
+  // ---------- input ----------
+  $('playBtn').onclick = e => { e.stopPropagation(); start(); };
+  $('againBtn').onclick = e => { e.stopPropagation(); start(); };
+  // menu button
+  $('menuBtn').onclick = e => { e.stopPropagation(); sfx.tick(); $('over').hidden = true; $('menu').hidden = false; state = 'menu'; reset(); showTab('play'); renderAll(); $('playBtn').focus(); };
+  const pokeLines = ['hey!', 'hehe', 'that tickles', 'stoppp', 'ok ok', 'rude', 'wheee'];
+  function poke() {
+    pokes++; jelly.squish = 1; sfx.tick();
+    addText(jelly.x, jelly.y - jelly.r * 2.2, pokeLines[Math.min(pokes - 1, pokeLines.length - 1)], '#ff8fd8');
+    if (pokes >= 7) unlock('poke');
+  }
+  cv.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if (state === 'play') return pulse();
+    if (state === 'menu') {
+      const rect = cv.getBoundingClientRect(), x = e.clientX - rect.left, y = e.clientY - rect.top;
+      if (Math.hypot(x - jelly.x, y - jelly.y) < jelly.r * 2) poke();
+    }
+  });
+  window.addEventListener('keydown', e => {
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT') return;
+    if (state === 'menu' && /^[a-z]$/i.test(e.key)) { typed = (typed + e.key.toLowerCase()).slice(-5); if (typed === 'jelly') { pokes = 6; poke(); } }
+    if (e.code !== 'Space' && e.code !== 'ArrowUp') return;
+    if (state === 'play') { e.preventDefault(); pulse(); return; }
+    if (tag === 'BUTTON' && e.code === 'Space') return;
+    if (!mp && (!$('menu').hidden || !$('over').hidden)) { e.preventDefault(); start(); }
+  });
+
+  // hook for screenshots / testing
+  window.__jd = { jelly, gates: () => gates, H: () => H, save, start, state: () => state, unlock, showTab, renderAll, set: (k, v) => { if (k === 'skin') skinKey = v; else save[k] = v; renderAll(); } };
+})();
+</script>
+</body></html>
